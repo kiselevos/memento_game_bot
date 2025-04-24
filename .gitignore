@@ -1,0 +1,13 @@
+# Go
+/bin/
+/vendor/
+*.exe
+*.test
+*.out
+
+# IDEs
+.vscode/
+.idea/
+
+# Env files
+.env
