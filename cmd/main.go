@@ -1,6 +1,7 @@
 package main
 
 import (
+	"PhotoBattleBot/internal/bot"
 	"log"
 	"os"
 	"time"
@@ -24,6 +25,9 @@ func main() {
 	pref := telebot.Settings{
 		Token:  token,
 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
+		OnError: func(err error, c telebot.Context) {
+			log.Printf("Error: %v\n", err)
+		},
 	}
 
 	b, err := telebot.NewBot(pref)
@@ -31,9 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	b.Handle("/start", func(c telebot.Context) error {
-		return c.Send("Привет! Я бот- Не очень интеллектуальная игра, для таких же друзей. Задача найти смешное фото в своей галерее. Добавь меня в группу и напиши /startgame")
-	})
+	bot.RegisterHandlers(b)
 
 	log.Println("Bot starts...")
 	b.Start()
