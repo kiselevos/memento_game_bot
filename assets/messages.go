@@ -29,4 +29,6 @@ const (
 %s`
 
 	UnknownCommandMessage = `❓ Неизвестная команда. Введите /help для списка доступных команд.`
+
+	GameRulesText = `Правила игры`
 )

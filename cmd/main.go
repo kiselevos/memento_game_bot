@@ -2,6 +2,7 @@ package main
 
 import (
 	"PhotoBattleBot/internal/bot"
+	"PhotoBattleBot/internal/game"
 	"log"
 	"os"
 	"time"
@@ -35,7 +36,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bot.RegisterHandlers(b)
+	// Инициализация GameManager
+	gm := game.NewGameManager()
+
+	bot.InitRouters(b, gm)
 
 	log.Println("Bot starts...")
 	b.Start()
