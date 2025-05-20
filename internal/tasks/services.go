@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"errors"
 	"math/rand"
 	"sync"
 )
@@ -24,7 +25,7 @@ func NewTasksList(filepath string) (*TasksList, error) {
 }
 
 // GetRandomTask - метод принимающий мапу использованных вопросов, возвращающий один из несипользуемых.
-func (tl *TasksList) GetRandomTask(used map[string]bool) string {
+func (tl *TasksList) GetRandomTask(used map[string]bool) (string, error) {
 
 	tl.mu.Lock()
 	defer tl.mu.Unlock()
@@ -36,5 +37,9 @@ func (tl *TasksList) GetRandomTask(used map[string]bool) string {
 		}
 	}
 
-	return avalibalTasks[rand.Intn(len(avalibalTasks))]
+	if len(avalibalTasks) == 0 {
+		return "", errors.New("Все задания уже использованы")
+	}
+
+	return avalibalTasks[rand.Intn(len(avalibalTasks))], nil
 }

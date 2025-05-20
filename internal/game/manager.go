@@ -33,13 +33,25 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 		ChatID: chatID,
 		State:  WaitingState,
 
-		Score:      make(map[int64]int),
-		UsedTasks:  make(map[string]bool),
-		Votes:      make(map[int64]int64),
-		UsersPhoto: make(map[int64]string),
+		Score:     make(map[int64]int),
+		UsedTasks: make(map[string]bool),
 	}
 
 	gm.sessions[chatID] = session
 
 	return session
+}
+
+// StartNewRound - запускает новый раунд в текущей сессии
+func (gm *GameManager) StartNewRound(session *GameSession, task string) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+
+	session.CarrentTask = task
+	session.State = RoundStartState
+	session.UsedTasks[task] = true
+	session.UsersPhoto = make(map[int64]string) // игроки -> фото
+	session.UserNames = make(map[int]string)    // Имена игроков
+	session.Votes = make(map[int64]int64)       // Голосование
+
 }
