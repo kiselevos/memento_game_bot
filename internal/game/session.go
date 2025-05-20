@@ -21,11 +21,12 @@ type GameSession struct {
 	UsedTasks map[string]bool // Для отслеживаания используемых вопросов
 
 	// Обнуляющиеся при новом раунде
-	UserNames   map[int64]string //Список участников раунда (Для автоматичекого подсчета и окончания раунда?)
-	State       RoundState       // Текущее состояне игры
-	Votes       map[int64]int64  // Кто кому отдал свой голос в раунде
-	UsersPhoto  map[int64]string // Хранение фотографий, отпрвленных юзером
-	CarrentTask string           // Текущее задание
+	UserNames        map[int64]string //Список участников раунда (Для автоматичекого подсчета и окончания раунда?)
+	State            RoundState       // Текущее состояне игры
+	Votes            map[int64]int64  // Кто кому отдал свой голос в раунде
+	UsersPhoto       map[int64]string // Хранение фотографий, отпрвленных юзером
+	CarrentTask      string           // Текущее задание
+	IndexPhotoToUser map[int]int64    // Мапа для голосования(Индекс очердности фото к игроку)
 
 	mu *sync.Mutex
 }

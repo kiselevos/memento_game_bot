@@ -1,7 +1,6 @@
 package game
 
 import (
-	"fmt"
 	"sync"
 
 	"gopkg.in/telebot.v3"
@@ -40,6 +39,8 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 
 		Score:     make(map[int64]int),
 		UsedTasks: make(map[string]bool),
+
+		mu: &sync.Mutex{},
 	}
 
 	gm.sessions[chatID] = session
@@ -57,7 +58,6 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) {
 	session.UsedTasks[task] = true
 	session.UsersPhoto = make(map[int64]string) // игроки -> фото
 	session.UserNames = make(map[int64]string)  // Имена игроков
-	session.Votes = make(map[int64]int64)       // Голосование
 
 }
 
@@ -76,7 +76,14 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 		session.UserNames[user.ID] = user.FirstName
 	}
 
-	fmt.Println(session)
-
 	return true
+}
+
+func (gm *GameManager) StartVoting(session *GameSession) {
+
+	session.mu.Lock()
+	defer session.mu.Unlock()
+
+	session.State = VoteState
+	session.Votes = make(map[int64]int64)
 }
