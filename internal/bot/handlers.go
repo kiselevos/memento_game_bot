@@ -3,6 +3,7 @@ package bot
 import (
 	messages "PhotoBattleBot/assets"
 	"PhotoBattleBot/internal/game"
+	"PhotoBattleBot/internal/tasks"
 
 	"gopkg.in/telebot.v3"
 )
@@ -11,13 +12,15 @@ import (
 type Handlers struct {
 	Bot         *telebot.Bot
 	GameManager *game.GameManager
+	TasksList   *tasks.TasksList
 }
 
 // NewHandlers создание нового хендлера через контруктор
-func NewHandlers(bot *telebot.Bot, gm *game.GameManager) *Handlers {
+func NewHandlers(bot *telebot.Bot, gm *game.GameManager, tl *tasks.TasksList) *Handlers {
 	return &Handlers{
 		Bot:         bot,
 		GameManager: gm,
+		TasksList:   tl,
 	}
 }
 

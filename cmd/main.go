@@ -3,6 +3,7 @@ package main
 import (
 	"PhotoBattleBot/internal/bot"
 	"PhotoBattleBot/internal/game"
+	"PhotoBattleBot/internal/tasks"
 	"log"
 	"os"
 	"time"
@@ -37,9 +38,13 @@ func main() {
 	}
 
 	// Инициализация GameManager
+	tl, err := tasks.NewTasksList("assets/tasks.json")
+	if err != nil {
+		log.Fatal(err)
+	}
 	gm := game.NewGameManager()
 
-	bot.InitRouters(b, gm)
+	bot.InitRouters(b, gm, tl)
 
 	log.Println("Bot starts...")
 	b.Start()
