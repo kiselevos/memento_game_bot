@@ -1,6 +1,11 @@
 package game
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+
+	"gopkg.in/telebot.v3"
+)
 
 // GameManager - управляет активными игровыми сессиями
 type GameManager struct {
@@ -51,7 +56,27 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) {
 	session.State = RoundStartState
 	session.UsedTasks[task] = true
 	session.UsersPhoto = make(map[int64]string) // игроки -> фото
-	session.UserNames = make(map[int]string)    // Имена игроков
+	session.UserNames = make(map[int64]string)  // Имена игроков
 	session.Votes = make(map[int64]int64)       // Голосование
 
+}
+
+func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID string) bool {
+
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+
+	session, _ := gm.sessions[chatID]
+
+	session.UsersPhoto[user.ID] = photoID
+
+	if user.Username != "" {
+		session.UserNames[user.ID] = "@" + user.Username
+	} else {
+		session.UserNames[user.ID] = user.FirstName
+	}
+
+	fmt.Println(session)
+
+	return true
 }
