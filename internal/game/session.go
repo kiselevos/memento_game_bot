@@ -2,6 +2,7 @@ package game
 
 import "sync"
 
+// Тип для орисания состояния игры
 type RoundState int
 
 // Constants for game state
@@ -11,6 +12,7 @@ const (
 	VoteState
 )
 
+// GameSession - Хранит данные о конкретной партии игры
 type GameSession struct {
 
 	// Постоянные
