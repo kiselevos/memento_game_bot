@@ -177,12 +177,12 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 		session.IndexPhotoToUser[indexPhoto] = val.UserID
 
 		h.Bot.Handle(&button, h.makeVoteHandler(chat.ID, indexPhoto))
-
-		h.Bot.Send(chat, &telebot.Photo{File: telebot.File{FileID: val.PhotoID}},
-			&telebot.SendOptions{
-				ReplyMarkup: &telebot.ReplyMarkup{InlineKeyboard: [][]telebot.InlineButton{{button}}},
-			})
-
+		if h.Bot != nil {
+			h.Bot.Send(chat, &telebot.Photo{File: telebot.File{FileID: val.PhotoID}},
+				&telebot.SendOptions{
+					ReplyMarkup: &telebot.ReplyMarkup{InlineKeyboard: [][]telebot.InlineButton{{button}}},
+				})
+		}
 	}
 
 	go h.voteTimeout(chat.ID, session)
@@ -247,18 +247,19 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 
 func (h *Handlers) FinishVoting(chatID int64, session *game.GameSession) {
 
-	err := session.FSM.Trigger(game.EventFinishVote)
 	if session.FSM.Current() != game.VoteState {
 		log.Printf("[WARN] Попытка повторного завершения голосования в чате %d", chatID)
 		return
 	}
 
+	h.GameManager.FinishVoting(session)
 	result := RenderResults(session, RoundScore)
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
-
-	h.Bot.Send(&telebot.Chat{ID: chatID}, result, markup)
+	if h.Bot != nil {
+		h.Bot.Send(&telebot.Chat{ID: chatID}, result, markup)
+	}
 }
 
 func (h *Handlers) HandleFinishVote(c telebot.Context) error {
@@ -283,8 +284,9 @@ func (h *Handlers) voteTimeout(chatID int64, session *game.GameSession) {
 	if !exist || session.FSM.Current() != game.VoteState {
 		return
 	}
-
-	h.Bot.Send(&telebot.Chat{ID: chatID}, "⏳ Голосование завершено автоматически!")
+	if h.Bot != nil {
+		h.Bot.Send(&telebot.Chat{ID: chatID}, "⏳ Голосование завершено автоматически!")
+	}
 	log.Printf("[TIMER] Автоматическое завершение голосования в чате %d", chatID)
 	h.FinishVoting(chatID, session)
 }

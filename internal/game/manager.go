@@ -59,15 +59,14 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 
 	log.Printf("[GAME] Новый раунд запущен в чате %d", session.ChatID)
 
-	err := session.FSM.Trigger(EventStartRound)
-	if err != nil {
-		return fmt.Errorf("Ошибка перехода FSM: " + err.Error())
+	if !SafeTrigger(session.FSM, EventStartRound, "StartNewRound") {
+		return fmt.Errorf("Ошибка перехода FSM")
 	}
 
 	session.CarrentTask = task
 	session.UsedTasks[task] = true
-	session.UsersPhoto = make(map[int64]string) // игроки -> фото
-	session.UserNames = make(map[int64]string)  // Имена игроков
+	session.UsersPhoto = make(map[int64]string)
+	session.UserNames = make(map[int64]string)
 
 	return nil
 }
@@ -91,20 +90,24 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 }
 
 func (gm *GameManager) StartVoting(session *GameSession) error {
-
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
 	log.Printf("[GAME] Голосование запущено в чате %d", session.ChatID)
 
-	err := session.FSM.Trigger(EventStartVote)
-	if err != nil {
-		log.Printf("[INFO] Попытка переода к голосованию. Игра запущена в чате %d", session.ChatID)
-		return fmt.Errorf("Ошибка перехода FSM: " + err.Error())
+	if !SafeTrigger(session.FSM, EventStartVote, "StartVoting") {
+		return fmt.Errorf("Ошибка перехода FSM")
 	}
 
 	session.Votes = make(map[int64]int64)
 	return nil
+}
+
+func (gm *GameManager) FinishVoting(session *GameSession) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+
+	SafeTrigger(session.FSM, EventFinishVote, "FinishVoting")
 }
 
 func (gm *GameManager) EndGame(chatID int64) {

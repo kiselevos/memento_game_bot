@@ -57,3 +57,14 @@ func (f *FSM) Trigger(event Event) error {
 	f.current = next
 	return nil
 }
+
+// Обертка над тригером.
+func SafeTrigger(fsm *FSM, event Event, context string) bool {
+	err := fsm.Trigger(event)
+	if err != nil {
+		log.Printf("[FSM][WARN] %s: переход не выполнен (%s → %s): %v",
+			context, fsm.Current(), event, err)
+		return false
+	}
+	return true
+}
