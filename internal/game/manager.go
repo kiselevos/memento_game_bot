@@ -106,3 +106,10 @@ func (gm *GameManager) StartVoting(session *GameSession) error {
 	session.Votes = make(map[int64]int64)
 	return nil
 }
+
+func (gm *GameManager) EndGame(chatID int64) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+
+	delete(gm.sessions, chatID)
+}

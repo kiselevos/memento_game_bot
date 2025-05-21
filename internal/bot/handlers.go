@@ -6,8 +6,7 @@ import (
 	"PhotoBattleBot/internal/tasks"
 	"fmt"
 	"log"
-	"sort"
-	"strings"
+	"time"
 
 	"gopkg.in/telebot.v3"
 )
@@ -38,11 +37,13 @@ func NewHandlers(bot *telebot.Bot, gm *game.GameManager, tl *tasks.TasksList) *H
 func (h *Handlers) Register() {
 	h.Bot.Handle("/startGame", h.StartGame)
 	h.Bot.Handle("/start", h.Start)
-	h.Bot.Handle(&h.startRoundBtn, h.OnStartRound)
-	h.Bot.Handle("/newRound", h.OnStartRound)
+	h.Bot.Handle(&h.startRoundBtn, h.HandleStartRound)
+	h.Bot.Handle("/newRound", h.HandleStartRound)
 	h.Bot.Handle(telebot.OnPhoto, h.TakeUserPhoto)
 	h.Bot.Handle("/vote", h.StartVote)
 	h.Bot.Handle("/finishVote", h.HandleFinishVote)
+	h.Bot.Handle("/endGame", h.HandleEndGame)
+	h.Bot.Handle("/score", h.HandleScore)
 }
 
 func (h *Handlers) Start(c telebot.Context) error {
@@ -61,7 +62,12 @@ func (h *Handlers) StartGame(c telebot.Context) error {
 	return c.Send(messages.GameRulesText, markup)
 }
 
-func (h *Handlers) OnStartRound(c telebot.Context) error {
+func (h *Handlers) HandleStartRound(c telebot.Context) error {
+	//Убираем анимацию мерцания кнопки
+	if c.Callback() != nil {
+		_ = c.Respond(&telebot.CallbackResponse{})
+	}
+
 	chatID := c.Chat().ID
 
 	session, exist := h.GameManager.GetSession(chatID)
@@ -73,7 +79,8 @@ func (h *Handlers) OnStartRound(c telebot.Context) error {
 	task, err := h.TasksList.GetRandomTask(session.UsedTasks)
 	if err != nil {
 		log.Printf("[INFO] Все вопросы в чате %d закончены", chatID)
-		return c.Send(messages.TheEndMessages)
+		h.HandleEndGame(c) // автоматический финал
+		return nil
 	}
 
 	err = h.GameManager.StartNewRound(session, task)
@@ -84,7 +91,13 @@ func (h *Handlers) OnStartRound(c telebot.Context) error {
 
 	text := messages.RoundStartedMessage + "\n" + task
 
-	return c.Send(text)
+	btn := h.startRoundBtn
+	btn.Text = "🔁 Поменять задание"
+
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{btn}}
+
+	return c.Send(text, markup)
 }
 
 // TakeUserPhoto - обирает фото только в уловиях запущенного раунда.
@@ -172,6 +185,8 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 
 	}
 
+	go h.voteTimeout(chat.ID, session)
+
 	return c.Send(messages.VotingStartedMessage)
 }
 
@@ -231,40 +246,19 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 }
 
 func (h *Handlers) FinishVoting(chatID int64, session *game.GameSession) {
-	var result strings.Builder
-	result.WriteString("🏆 Результаты голосования:\n\n")
-
-	// Собираем результаты
-	type playerResult struct {
-		userID int64
-		score  int
-	}
-
-	var results []playerResult
-	for userID, score := range session.Score {
-		results = append(results, playerResult{userID, score})
-	}
-
-	// Сортируем по убыванию голосов
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].score > results[j].score
-	})
-
-	// Формируем сообщение
-	for i, res := range results {
-		name := session.GetUserName(res.userID)
-		result.WriteString(fmt.Sprintf("%d. %s — %d голосов\n", i+1, name, res.score))
-	}
 
 	err := session.FSM.Trigger(game.EventFinishVote)
-	if err != nil {
-		h.Bot.Send(&telebot.Chat{ID: chatID}, "Ошибка перехода FSM: "+err.Error())
+	if session.FSM.Current() != game.VoteState {
+		log.Printf("[WARN] Попытка повторного завершения голосования в чате %d", chatID)
+		return
 	}
+
+	result := RenderResults(session, RoundScore)
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
 
-	h.Bot.Send(&telebot.Chat{ID: chatID}, result.String(), markup)
+	h.Bot.Send(&telebot.Chat{ID: chatID}, result, markup)
 }
 
 func (h *Handlers) HandleFinishVote(c telebot.Context) error {
@@ -278,4 +272,48 @@ func (h *Handlers) HandleFinishVote(c telebot.Context) error {
 
 	h.FinishVoting(chatID, session)
 	return nil
+}
+
+func (h *Handlers) voteTimeout(chatID int64, session *game.GameSession) {
+	const voteDuration = 33 * time.Second
+
+	time.Sleep(voteDuration)
+
+	session, exist := h.GameManager.GetSession(chatID)
+	if !exist || session.FSM.Current() != game.VoteState {
+		return
+	}
+
+	h.Bot.Send(&telebot.Chat{ID: chatID}, "⏳ Голосование завершено автоматически!")
+	log.Printf("[TIMER] Автоматическое завершение голосования в чате %d", chatID)
+	h.FinishVoting(chatID, session)
+}
+
+func (h *Handlers) HandleEndGame(c telebot.Context) error {
+	chatID := c.Chat().ID
+
+	session, exist := h.GameManager.GetSession(chatID)
+	if !exist {
+		return c.Send(messages.GameNotStarted)
+	}
+
+	result := RenderResults(session, FinalScore)
+
+	h.GameManager.EndGame(chatID)
+
+	return c.Send(result + "\n\nЧтобы начать новую игру, введите /startGame")
+}
+
+func (h *Handlers) HandleScore(c telebot.Context) error {
+	chatID := c.Chat().ID
+
+	session, exist := h.GameManager.GetSession(chatID)
+	if !exist {
+		return c.Send(messages.GameNotStarted)
+	}
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
+
+	result := RenderResults(session, GameScore)
+	return c.Send(result, markup)
 }
