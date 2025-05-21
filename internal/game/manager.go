@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"gopkg.in/telebot.v3"
@@ -34,6 +35,8 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
+	log.Printf("[GAME] Игра запущена в чате %d", chatID)
+
 	session := &GameSession{
 		ChatID: chatID,
 		FSM:    NewFSM(),
@@ -53,6 +56,8 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
+
+	log.Printf("[GAME] Новый раунд запущен в чате %d", session.ChatID)
 
 	err := session.FSM.Trigger(EventStartRound)
 	if err != nil {
@@ -90,8 +95,11 @@ func (gm *GameManager) StartVoting(session *GameSession) error {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
+	log.Printf("[GAME] Голосование запущено в чате %d", session.ChatID)
+
 	err := session.FSM.Trigger(EventStartVote)
 	if err != nil {
+		log.Printf("[INFO] Попытка переода к голосованию. Игра запущена в чате %d", session.ChatID)
 		return fmt.Errorf("Ошибка перехода FSM: " + err.Error())
 	}
 

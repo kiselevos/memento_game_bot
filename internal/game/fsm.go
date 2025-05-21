@@ -1,6 +1,9 @@
 package game
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 type State string
 type Event string
@@ -48,6 +51,7 @@ func (f *FSM) Current() State {
 func (f *FSM) Trigger(event Event) error {
 	next, ok := f.transistions[f.current][event]
 	if !ok {
+		log.Printf("[FSM] %s --(%s)--> %s", f.current, event, next)
 		return fmt.Errorf("invalid transition: %s → (%s)", f.current, event)
 	}
 	f.current = next

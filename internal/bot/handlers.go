@@ -5,6 +5,7 @@ import (
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/tasks"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -63,16 +64,19 @@ func (h *Handlers) OnStartRound(c telebot.Context) error {
 
 	session, exist := h.GameManager.GetSession(chatID)
 	if !exist {
+		log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chatID)
 		return c.Send(messages.GameNotStarted)
 	}
 
 	task, err := h.TasksList.GetRandomTask(session.UsedTasks)
 	if err != nil {
+		log.Printf("[INFO] Все вопросы в чате %d закончены", chatID)
 		return c.Send(messages.TheEndMessages)
 	}
 
 	err = h.GameManager.StartNewRound(session, task)
 	if err != nil {
+		log.Printf("[ERROR] Ошибка начала нового раунда %d", chatID)
 		c.Send(err)
 	}
 
@@ -119,6 +123,7 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 
 	session, exist := h.GameManager.GetSession(chat.ID)
 	if !exist || session.FSM.Current() != game.RoundStartState {
+		log.Printf("[INFO] Попытка запуска голосования без раунда %d", chat.ID)
 		return c.Send("На данный момент нет запущенного раунда")
 	}
 
@@ -129,6 +134,7 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 
 	err := h.GameManager.StartVoting(session)
 	if err != nil {
+		log.Printf("[INFO] Попытка запуска голосования без раунда %d", chat.ID)
 		return c.Send("Проблема с переходом FSM")
 	}
 
@@ -192,8 +198,9 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 
 	targetUserID, exists := session.IndexPhotoToUser[photoNum]
 	if !exists {
+		log.Printf("[ERROR] Hеизвестный номер фото для голосования! Номер чата: %d", chatID)
 		return c.Respond(&telebot.CallbackResponse{
-			Text: "Ошибка: неизвестный номер фото.",
+			Text: "Упсс... Ошибка уже направлена разработчику. Спасибо!",
 		})
 	}
 

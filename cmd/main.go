@@ -3,6 +3,7 @@ package main
 import (
 	"PhotoBattleBot/internal/bot"
 	"PhotoBattleBot/internal/game"
+	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/tasks"
 	"log"
 	"os"
@@ -13,6 +14,8 @@ import (
 )
 
 func main() {
+
+	logging.InitLogger("bot.log")
 
 	err := godotenv.Load()
 	if err != nil {
