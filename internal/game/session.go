@@ -2,16 +2,6 @@ package game
 
 import "sync"
 
-// Тип для орисания состояния игры
-type RoundState int
-
-// Constants for game state
-const (
-	WaitingState RoundState = iota
-	RoundStartState
-	VoteState
-)
-
 // GameSession - Хранит данные о конкретной партии игры
 type GameSession struct {
 
@@ -22,13 +12,13 @@ type GameSession struct {
 
 	// Обнуляющиеся при новом раунде
 	UserNames        map[int64]string //Список участников раунда (Для автоматичекого подсчета и окончания раунда?)
-	State            RoundState       // Текущее состояне игры
+	FSM              *FSM             // Машина состояний
 	Votes            map[int64]int64  // Кто кому отдал свой голос в раунде
 	UsersPhoto       map[int64]string // Хранение фотографий, отпрвленных юзером
 	CarrentTask      string           // Текущее задание
 	IndexPhotoToUser map[int]int64    // Мапа для голосования(Индекс очердности фото к игроку)
 
-	mu *sync.Mutex
+	mu sync.Mutex
 }
 
 // GetUserName - возвращает имя или ник пользователя

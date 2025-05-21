@@ -71,7 +71,10 @@ func (h *Handlers) OnStartRound(c telebot.Context) error {
 		return c.Send(messages.TheEndMessages)
 	}
 
-	h.GameManager.StartNewRound(session, task)
+	err = h.GameManager.StartNewRound(session, task)
+	if err != nil {
+		c.Send(err)
+	}
 
 	text := messages.RoundStartedMessage + "\n" + task
 
@@ -84,7 +87,7 @@ func (h *Handlers) TakeUserPhoto(c telebot.Context) error {
 	user := c.Sender()
 
 	session, exist := h.GameManager.GetSession(chat.ID)
-	if !exist || session.State != game.RoundStartState {
+	if !exist || session.FSM.Current() != game.RoundStartState {
 		return nil
 	}
 
@@ -115,7 +118,7 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 	chat := c.Chat()
 
 	session, exist := h.GameManager.GetSession(chat.ID)
-	if !exist || session.State != game.RoundStartState {
+	if !exist || session.FSM.Current() != game.RoundStartState {
 		return c.Send("На данный момент нет запущенного раунда")
 	}
 
@@ -124,10 +127,10 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 	// 	return c.Send(messages.NotEnoughPlayers)
 	// }
 
-	h.GameManager.StartVoting(session)
-
-	// Нужно л обновлять ссесию?
-	session, _ = h.GameManager.GetSession(chat.ID)
+	err := h.GameManager.StartVoting(session)
+	if err != nil {
+		return c.Send("Проблема с переходом FSM")
+	}
 
 	// вспомогательная структура для вытаскивания фото
 	type photoWithInd struct {
@@ -175,7 +178,7 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 	voter := c.Sender()
 
 	session, exist := h.GameManager.GetSession(chatID)
-	if !exist || session.State != game.VoteState {
+	if !exist || session.FSM.Current() != game.VoteState {
 		return c.Respond(&telebot.CallbackResponse{
 			Text: "Голосование ещё не началось или уже завершено.",
 		})
@@ -243,7 +246,10 @@ func (h *Handlers) FinishVoting(chatID int64, session *game.GameSession) {
 		result.WriteString(fmt.Sprintf("%d. %s — %d голосов\n", i+1, name, res.score))
 	}
 
-	session.State = game.WaitingState
+	err := session.FSM.Trigger(game.EventFinishVote)
+	if err != nil {
+		h.Bot.Send(&telebot.Chat{ID: chatID}, "Ошибка перехода FSM: "+err.Error())
+	}
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}

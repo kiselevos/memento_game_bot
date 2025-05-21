@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"sync"
 
 	"gopkg.in/telebot.v3"
@@ -9,14 +10,14 @@ import (
 // GameManager - управляет активными игровыми сессиями
 type GameManager struct {
 	sessions map[int64]*GameSession
-	mu       *sync.Mutex
+	mu       sync.Mutex
 }
 
 // NewGameManager создаёт и возвращает новый экземпляр GameManager
 func NewGameManager() *GameManager {
 	return &GameManager{
 		sessions: make(map[int64]*GameSession),
-		mu:       &sync.Mutex{},
+		mu:       sync.Mutex{},
 	}
 }
 
@@ -35,12 +36,12 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 
 	session := &GameSession{
 		ChatID: chatID,
-		State:  WaitingState,
+		FSM:    NewFSM(),
 
 		Score:     make(map[int64]int),
 		UsedTasks: make(map[string]bool),
 
-		mu: &sync.Mutex{},
+		mu: sync.Mutex{},
 	}
 
 	gm.sessions[chatID] = session
@@ -49,16 +50,21 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 }
 
 // StartNewRound - запускает новый раунд в текущей сессии
-func (gm *GameManager) StartNewRound(session *GameSession, task string) {
+func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
+	err := session.FSM.Trigger(EventStartRound)
+	if err != nil {
+		return fmt.Errorf("Ошибка перехода FSM: " + err.Error())
+	}
+
 	session.CarrentTask = task
-	session.State = RoundStartState
 	session.UsedTasks[task] = true
 	session.UsersPhoto = make(map[int64]string) // игроки -> фото
 	session.UserNames = make(map[int64]string)  // Имена игроков
 
+	return nil
 }
 
 func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID string) bool {
@@ -79,11 +85,16 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 	return true
 }
 
-func (gm *GameManager) StartVoting(session *GameSession) {
+func (gm *GameManager) StartVoting(session *GameSession) error {
 
-	session.mu.Lock()
-	defer session.mu.Unlock()
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
 
-	session.State = VoteState
+	err := session.FSM.Trigger(EventStartVote)
+	if err != nil {
+		return fmt.Errorf("Ошибка перехода FSM: " + err.Error())
+	}
+
 	session.Votes = make(map[int64]int64)
+	return nil
 }
