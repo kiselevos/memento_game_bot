@@ -39,8 +39,10 @@ func (h *Handlers) Register() {
 	h.Bot.Handle("/startGame", h.StartGame)
 	h.Bot.Handle("/start", h.Start)
 	h.Bot.Handle(&h.startRoundBtn, h.OnStartRound)
+	h.Bot.Handle("/newRound", h.OnStartRound)
 	h.Bot.Handle(telebot.OnPhoto, h.TakeUserPhoto)
 	h.Bot.Handle("/vote", h.StartVote)
+	h.Bot.Handle("/finishVote", h.HandleFinishVote)
 }
 
 func (h *Handlers) Start(c telebot.Context) error {
@@ -77,7 +79,7 @@ func (h *Handlers) OnStartRound(c telebot.Context) error {
 	err = h.GameManager.StartNewRound(session, task)
 	if err != nil {
 		log.Printf("[ERROR] Ошибка начала нового раунда %d", chatID)
-		c.Send(err)
+		return c.Send("Упсс... Что то не так, но ошибка уже направлена разработчику.", err)
 	}
 
 	text := messages.RoundStartedMessage + "\n" + task
@@ -198,7 +200,7 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 
 	targetUserID, exists := session.IndexPhotoToUser[photoNum]
 	if !exists {
-		log.Printf("[ERROR] Hеизвестный номер фото для голосования! Номер чата: %d", chatID)
+		log.Printf("[ERROR] Hеизвестный номер фото для голосования! Номер чата: %d\n", chatID)
 		return c.Respond(&telebot.CallbackResponse{
 			Text: "Упсс... Ошибка уже направлена разработчику. Спасибо!",
 		})
@@ -220,9 +222,10 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 		return err
 	}
 
-	if len(session.Votes) == len(session.UsersPhoto) {
-		h.FinishVoting(chatID, session)
-	}
+	// Некоррекная логика игры. Голосовать могут все, скинуть фото - не все.
+	// if len(session.Votes) == len(session.UsersPhoto) {
+	// 	h.FinishVoting(chatID, session)
+	// }
 
 	return c.Send(fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID)))
 }
@@ -262,4 +265,17 @@ func (h *Handlers) FinishVoting(chatID int64, session *game.GameSession) {
 	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
 
 	h.Bot.Send(&telebot.Chat{ID: chatID}, result.String(), markup)
+}
+
+func (h *Handlers) HandleFinishVote(c telebot.Context) error {
+	chatID := c.Chat().ID
+
+	session, exist := h.GameManager.GetSession(chatID)
+	if !exist || session.FSM.Current() != game.VoteState {
+		log.Printf("[INFO] Попытка окончания голосования без раунда %d", chatID)
+		return c.Send("Сейчас голосование не активно.")
+	}
+
+	h.FinishVoting(chatID, session)
+	return nil
 }
