@@ -13,7 +13,6 @@ const (
 
 	// События
 	EventStartRound Event = "start_round"
-	EventSendPhoto  Event = "send_photo"
 	EventStartVote  Event = "start_vote"
 	EventFinishVote Event = "finish_vote"
 )
@@ -31,10 +30,11 @@ func NewFSM() *FSM {
 				EventStartRound: RoundStartState,
 			},
 			RoundStartState: {
-				EventSendPhoto: RoundStartState,
-				EventStartVote: VoteState,
+				EventStartRound: RoundStartState,
+				EventStartVote:  VoteState,
 			},
 			VoteState: {
+				EventStartRound: RoundStartState,
 				EventFinishVote: WaitingState,
 			},
 		},
