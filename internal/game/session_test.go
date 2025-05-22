@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+
+	"gopkg.in/telebot.v3"
 )
 
 const (
@@ -72,5 +74,49 @@ func TestFinalScore(t *testing.T) {
 
 	if !reflect.DeepEqual(got, scoreResult) {
 		t.Errorf("Expected final score %v, got %v", scoreResult, got)
+	}
+}
+
+func TestTakePhoto(t *testing.T) {
+
+	s := newTestGameSession()
+
+	user := &telebot.User{
+		ID:        userID_1,
+		Username:  userName_1,
+		FirstName: "Bob",
+	}
+	photoID := "testphotostring"
+
+	s.TakePhoto(user, photoID)
+
+	t.Run("Photo saved", func(t *testing.T) {
+		got := s.UsersPhoto[user.ID]
+		if got != photoID {
+			t.Errorf("Expected photoID %s, got %s", photoID, got)
+		}
+	})
+
+	t.Run("Username saved", func(t *testing.T) {
+		got := s.UserNames[user.ID]
+		if got != userName_1 {
+			t.Errorf("Expected %s, got %s", got, userName_1)
+		}
+	})
+}
+
+func TestTakePhotoWithoutUsername(t *testing.T) {
+	s := newTestGameSession()
+
+	user := &telebot.User{
+		ID:        userID_2,
+		Username:  "",
+		FirstName: userName_2,
+	}
+	s.TakePhoto(user, "pic123")
+
+	name := s.UserNames[user.ID]
+	if name != userName_2 {
+		t.Errorf("Expected %s, got %s", userName_2, name)
 	}
 }

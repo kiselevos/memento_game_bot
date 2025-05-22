@@ -35,19 +35,19 @@ func NewHandlers(bot *telebot.Bot, gm *game.GameManager, tl *tasks.TasksList) *H
 }
 
 func (h *Handlers) Register() {
-	h.Bot.Handle("/startGame", h.StartGame)
+	h.Bot.Handle("/startgame", h.StartGame)
 	h.Bot.Handle("/start", h.Start)
 	h.Bot.Handle(&h.startRoundBtn, h.HandleStartRound)
-	h.Bot.Handle("/newRound", h.HandleStartRound)
+	h.Bot.Handle("/newround", h.HandleStartRound)
 	h.Bot.Handle(telebot.OnPhoto, h.TakeUserPhoto)
 	h.Bot.Handle("/vote", h.StartVote)
-	h.Bot.Handle("/finishVote", h.HandleFinishVote)
-	h.Bot.Handle("/endGame", h.HandleEndGame)
+	h.Bot.Handle("/finishvote", h.HandleFinishVote)
+	h.Bot.Handle("/endgame", h.HandleEndGame)
 	h.Bot.Handle("/score", h.HandleScore)
 }
 
 func (h *Handlers) Start(c telebot.Context) error {
-	return c.Send(messages.WelcomeMessage)
+	return c.Send(messages.WelcomeSingleMessage)
 }
 
 func (h *Handlers) StartGame(c telebot.Context) error {

@@ -61,7 +61,7 @@ func TestEndGame(t *testing.T) {
 	}
 }
 
-func TestGameManager_ConcurrentAccess(t *testing.T) {
+func TestConcurrentAccess(t *testing.T) {
 	gm := newTestGameManager()
 
 	const N = 100
@@ -80,4 +80,36 @@ func TestGameManager_ConcurrentAccess(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+// Разобраться с тестом.
+func TestStartVoting(t *testing.T) {
+
+	gm := newTestGameManager()
+	s := gm.sessions[chatID]
+
+	err := gm.StartVoting(s)
+	if err != nil {
+		t.Fatalf("Expected StartVoting to succeed, got error: %v", err)
+	}
+
+	if s.FSM.Current() != VoteState {
+		t.Errorf("Expected FSM to be in VoteState, got %s", s.FSM.Current())
+	}
+
+	if len(s.Votes) != 0 {
+		t.Errorf("Votes map should be empty, got length %d", len(s.Votes))
+	}
+}
+
+func TestFinishVoting(t *testing.T) {
+	gm := newTestGameManager()
+	s := gm.sessions[chatID]
+
+	_ = gm.StartVoting(s)
+	gm.FinishVoting(s)
+
+	if s.FSM.Current() != WaitingState {
+		t.Errorf("Expected FSM to be in WaitingState, got %s", s.FSM.Current())
+	}
 }
