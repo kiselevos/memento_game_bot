@@ -80,6 +80,7 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 
 	session.UsersPhoto[user.ID] = photoID
 
+	// TODO: Собрать фидбэк по поводу имен. Как лучше?
 	if user.Username != "" {
 		session.UserNames[user.ID] = "@" + user.Username
 	} else {
