@@ -129,7 +129,7 @@ func (h *Handlers) TakeUserPhoto(c telebot.Context) error {
 
 	h.GameManager.TakePhoto(chat.ID, user, fileID)
 
-	return c.Send(fmt.Sprintf("%s, ваше фото принято.", session.GetUserName(user.ID)))
+	return c.Send(fmt.Sprintf("%s, %s", messages.PhotoReceived, session.GetUserName(user.ID)))
 }
 
 func (h *Handlers) StartVote(c telebot.Context) error {
@@ -203,13 +203,13 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 	session, exist := h.GameManager.GetSession(chatID)
 	if !exist || session.FSM.Current() != game.VoteState {
 		return c.Respond(&telebot.CallbackResponse{
-			Text: "Голосование ещё не началось или уже завершено.",
+			Text: messages.VotedEarler,
 		})
 	}
 
 	if _, voted := session.Votes[voter.ID]; voted {
 		return c.Respond(&telebot.CallbackResponse{
-			Text: "Вы уже проголосовали!",
+			Text: messages.VotedAlready,
 		})
 	}
 
@@ -231,7 +231,7 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 	session.Score[targetUserID]++
 
 	err := c.Respond(&telebot.CallbackResponse{
-		Text: fmt.Sprintf("Ваш голос учтён за фото №%d!", photoNum),
+		Text: messages.VotedReceived,
 	})
 	if err != nil {
 		return err
@@ -253,7 +253,7 @@ func (h *Handlers) FinishVoting(chatID int64, session *game.GameSession) {
 	}
 
 	h.GameManager.FinishVoting(session)
-	result := RenderResults(session, RoundScore)
+	result := RenderScore(RoundScore, session.RoundScore())
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
@@ -299,7 +299,7 @@ func (h *Handlers) HandleEndGame(c telebot.Context) error {
 		return c.Send(messages.GameNotStarted)
 	}
 
-	result := RenderResults(session, FinalScore)
+	result := RenderScore(FinalScore, session.TotalScore())
 
 	h.GameManager.EndGame(chatID)
 
@@ -316,6 +316,6 @@ func (h *Handlers) HandleScore(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
 
-	result := RenderResults(session, GameScore)
+	result := RenderScore(GameScore, session.TotalScore())
 	return c.Send(result, markup)
 }

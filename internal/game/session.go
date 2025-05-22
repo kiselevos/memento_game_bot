@@ -1,6 +1,9 @@
 package game
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 // GameSession - Хранит данные о конкретной партии игры
 type GameSession struct {
@@ -21,10 +24,46 @@ type GameSession struct {
 	mu sync.Mutex
 }
 
+type PlayerScore struct {
+	UserID   int64
+	UserName string
+	Value    int
+}
+
 // GetUserName - возвращает имя или ник пользователя
 func (s *GameSession) GetUserName(userID int64) string {
 	if name, ok := s.UserNames[userID]; ok {
 		return name
 	}
 	return "Анонимный Осётр"
+}
+
+func (s *GameSession) TotalScore() []PlayerScore {
+	return s.scoreFromMap(s.Score)
+}
+
+func (s *GameSession) RoundScore() []PlayerScore {
+	voteCount := make(map[int64]int)
+	for _, votedFor := range s.Votes {
+		voteCount[votedFor]++
+	}
+	return s.scoreFromMap(voteCount)
+}
+
+func (s *GameSession) scoreFromMap(data map[int64]int) []PlayerScore {
+	var result []PlayerScore
+
+	for userID, val := range data {
+		result = append(result, PlayerScore{
+			UserID:   userID,
+			UserName: s.GetUserName(userID),
+			Value:    val,
+		})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Value > result[j].Value
+	})
+
+	return result
 }
