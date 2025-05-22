@@ -85,8 +85,8 @@ func (h *Handlers) HandleStartRound(c telebot.Context) error {
 
 	err = h.GameManager.StartNewRound(session, task)
 	if err != nil {
-		log.Printf("[ERROR] Ошибка начала нового раунда %d", chatID)
-		return c.Send("Упсс... Что то не так, но ошибка уже направлена разработчику.", err)
+		log.Printf("[ERROR] Ошибка начала нового раунда %d, %v", chatID, err)
+		return c.Send(messages.ErrorMessagesForUser)
 	}
 
 	text := messages.RoundStartedMessage + "\n" + task
@@ -123,7 +123,7 @@ func (h *Handlers) TakeUserPhoto(c telebot.Context) error {
 	_, exist = session.UsersPhoto[user.ID]
 
 	if exist {
-		// Подумать о функционале, возможно заменять фото???
+		//TODO: Подумать о функционале, возможно заменять фото???
 		return nil
 	}
 
@@ -150,7 +150,7 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 	err := h.GameManager.StartVoting(session)
 	if err != nil {
 		log.Printf("[INFO] Попытка запуска голосования без раунда %d", chat.ID)
-		return c.Send("Проблема с переходом FSM")
+		return c.Send(messages.ErrorMessagesForUser)
 	}
 
 	// вспомогательная структура для вытаскивания фото
@@ -236,11 +236,6 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 	if err != nil {
 		return err
 	}
-
-	// Некоррекная логика игры. Голосовать могут все, скинуть фото - не все.
-	// if len(session.Votes) == len(session.UsersPhoto) {
-	// 	h.FinishVoting(chatID, session)
-	// }
 
 	return c.Send(fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID)))
 }
