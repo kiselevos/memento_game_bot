@@ -71,23 +71,13 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	return nil
 }
 
-func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID string) bool {
+func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID string) {
 
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
 	session, _ := gm.sessions[chatID]
-
-	session.UsersPhoto[user.ID] = photoID
-
-	// TODO: Собрать фидбэк по поводу имен. Как лучше?
-	if user.Username != "" {
-		session.UserNames[user.ID] = "@" + user.Username
-	} else {
-		session.UserNames[user.ID] = user.FirstName
-	}
-
-	return true
+	session.TakePhoto(user, photoID)
 }
 
 func (gm *GameManager) StartVoting(session *GameSession) error {
