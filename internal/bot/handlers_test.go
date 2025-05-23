@@ -58,19 +58,28 @@ func (m *mockContext) Callback() *tb.Callback {
 	return nil
 }
 
-func TestStartGame(t *testing.T) {
+func SetupTestHandler() (*MockBot, *Handlers, *tb.Chat, *mockContext, *game.GameSession) {
 
 	mockBot := new(MockBot)
 
 	gm := game.NewGameManager()
-	tl := &tasks.TasksList{AllTasks: []string{"test task"}}
+	tl := tasks.NewTasksListForTest([]string{"test task"})
 
 	handlers := NewHandlers(mockBot, gm, tl)
 
-	const testChatId = 12345
-	chat := &tb.Chat{ID: testChatId}
+	const testChatID = 12345
+	session := gm.StartNewGameSession(testChatID)
+
+	chat := &tb.Chat{ID: testChatID}
 	fakeCtx := &tb.Message{Chat: chat}
 	ctx := &mockContext{chat: chat, message: fakeCtx, mockBot: mockBot}
+
+	return mockBot, handlers, chat, ctx, session
+}
+
+func TestStartGame(t *testing.T) {
+
+	mockBot, handlers, chat, ctx, _ := SetupTestHandler()
 
 	mockBot.On("Send", chat, mock.Anything).Return(&tb.Message{}, nil)
 
@@ -88,19 +97,8 @@ func TestStartGame(t *testing.T) {
 }
 
 func TestStartRound(t *testing.T) {
-	mockBot := new(MockBot)
 
-	gm := game.NewGameManager()
-	tl := tasks.NewTasksListForTest([]string{"test task"})
-
-	handlers := NewHandlers(mockBot, gm, tl)
-
-	const testChatId = 12345
-	gm.StartNewGameSession(testChatId)
-
-	chat := &tb.Chat{ID: testChatId}
-	fakeCtx := &tb.Message{Chat: chat}
-	ctx := &mockContext{chat: chat, message: fakeCtx, mockBot: mockBot}
+	mockBot, handlers, chat, ctx, _ := SetupTestHandler()
 
 	mockBot.On("Send", chat, mock.MatchedBy(func(msg interface{}) bool {
 		text, ok := msg.(string)
