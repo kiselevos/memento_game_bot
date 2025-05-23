@@ -3,6 +3,7 @@ package bot
 import (
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/tasks"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -53,6 +54,10 @@ func (m *mockContext) Send(what interface{}, _ ...interface{}) error {
 	return err
 }
 
+func (m *mockContext) Callback() *tb.Callback {
+	return nil
+}
+
 func TestStartGame(t *testing.T) {
 
 	mockBot := new(MockBot)
@@ -77,6 +82,34 @@ func TestStartGame(t *testing.T) {
 	err = handlers.StartGame(ctx)
 	if err != nil {
 		t.Errorf("Command /startgame return error: %v", err)
+	}
+
+	mockBot.AssertCalled(t, "Send", chat, mock.Anything)
+}
+
+func TestStartRound(t *testing.T) {
+	mockBot := new(MockBot)
+
+	gm := game.NewGameManager()
+	tl := tasks.NewTasksListForTest([]string{"test task"})
+
+	handlers := NewHandlers(mockBot, gm, tl)
+
+	const testChatId = 12345
+	gm.StartNewGameSession(testChatId)
+
+	chat := &tb.Chat{ID: testChatId}
+	fakeCtx := &tb.Message{Chat: chat}
+	ctx := &mockContext{chat: chat, message: fakeCtx, mockBot: mockBot}
+
+	mockBot.On("Send", chat, mock.MatchedBy(func(msg interface{}) bool {
+		text, ok := msg.(string)
+		return ok && strings.Contains(text, "🎲") // начало задания
+	})).Return(&tb.Message{}, nil)
+
+	err := handlers.HandleStartRound(ctx)
+	if err != nil {
+		t.Errorf("HandleStartRound returned error: %v", err)
 	}
 
 	mockBot.AssertCalled(t, "Send", chat, mock.Anything)

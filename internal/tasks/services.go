@@ -11,6 +11,14 @@ type TasksList struct {
 	mu       *sync.Mutex
 }
 
+// Фабрика для тестов
+func NewTasksListForTest(all []string) *TasksList {
+	return &TasksList{
+		AllTasks: all,
+		mu:       &sync.Mutex{},
+	}
+}
+
 // NewTasksList - Конструктор для структуры списка вопросов
 func NewTasksList(filepath string) (*TasksList, error) {
 	tasks, err := loadTasksFromFile(filepath)

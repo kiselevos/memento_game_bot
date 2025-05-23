@@ -298,7 +298,7 @@ func (h *Handlers) HandleEndGame(c telebot.Context) error {
 
 	h.GameManager.EndGame(chatID)
 
-	return c.Send(result + "\n\nЧтобы начать новую игру, введите /startGame")
+	return c.Send(result + "\n\n" + messages.FinishGameMassage)
 }
 
 func (h *Handlers) HandleScore(c telebot.Context) error {
