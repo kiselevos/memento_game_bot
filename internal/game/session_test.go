@@ -29,6 +29,7 @@ func newTestGameSession() *GameSession {
 		CarrentTask:      "Задание",
 		IndexPhotoToUser: make(map[int]int64),
 		mu:               sync.Mutex{},
+		FSM:              NewFSM(),
 	}
 }
 

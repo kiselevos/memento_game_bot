@@ -82,11 +82,11 @@ func TestConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
-// Разобраться с тестом.
 func TestStartVoting(t *testing.T) {
 
 	gm := newTestGameManager()
 	s := gm.sessions[chatID]
+	s.FSM.current = RoundStartState
 
 	err := gm.StartVoting(s)
 	if err != nil {
