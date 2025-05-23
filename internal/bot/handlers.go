@@ -59,6 +59,10 @@ func (h *Handlers) StartGame(c telebot.Context) error {
 
 	h.GameManager.StartNewGameSession(chatID)
 
+	if h.Bot != nil {
+		h.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage)
+	}
+
 	return c.Send(messages.GameRulesText, markup)
 }
 
@@ -117,9 +121,6 @@ func (h *Handlers) TakeUserPhoto(c telebot.Context) error {
 
 	fileID := photo.File.FileID
 
-	// Удаляем фотографию
-	_ = h.Bot.Delete(c.Message())
-
 	_, exist = session.UsersPhoto[user.ID]
 
 	if exist {
@@ -127,9 +128,12 @@ func (h *Handlers) TakeUserPhoto(c telebot.Context) error {
 		return nil
 	}
 
+	// Удаляем фотографию
+	_ = h.Bot.Delete(c.Message())
+
 	h.GameManager.TakePhoto(chat.ID, user, fileID)
 
-	return c.Send(fmt.Sprintf("%s, %s", messages.PhotoReceived, session.GetUserName(user.ID)))
+	return c.Send(fmt.Sprintf("%s, %s", session.GetUserName(user.ID), messages.PhotoReceived))
 }
 
 func (h *Handlers) StartVote(c telebot.Context) error {
