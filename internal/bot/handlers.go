@@ -13,7 +13,7 @@ import (
 
 // Handlers структура хранящая в себе bot и GameManager для роутинга
 type Handlers struct {
-	Bot         *telebot.Bot
+	Bot         BotInterface // Меняем на интерфейс для моков
 	GameManager *game.GameManager
 	TasksList   *tasks.TasksList
 
@@ -21,7 +21,7 @@ type Handlers struct {
 }
 
 // NewHandlers создание нового хендлера через контруктор
-func NewHandlers(bot *telebot.Bot, gm *game.GameManager, tl *tasks.TasksList) *Handlers {
+func NewHandlers(bot BotInterface, gm *game.GameManager, tl *tasks.TasksList) *Handlers {
 	h := &Handlers{
 		Bot:         bot,
 		GameManager: gm,

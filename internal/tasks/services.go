@@ -7,7 +7,7 @@ import (
 )
 
 type TasksList struct {
-	allTasks []string
+	AllTasks []string
 	mu       *sync.Mutex
 }
 
@@ -19,7 +19,7 @@ func NewTasksList(filepath string) (*TasksList, error) {
 	}
 
 	return &TasksList{
-		allTasks: tasks,
+		AllTasks: tasks,
 		mu:       &sync.Mutex{},
 	}, nil
 }
@@ -31,7 +31,7 @@ func (tl *TasksList) GetRandomTask(used map[string]bool) (string, error) {
 	defer tl.mu.Unlock()
 
 	var avalibalTasks []string
-	for _, task := range tl.allTasks {
+	for _, task := range tl.AllTasks {
 		if !used[task] {
 			avalibalTasks = append(avalibalTasks, task)
 		}

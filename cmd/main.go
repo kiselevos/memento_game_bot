@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"gopkg.in/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 func main() {
@@ -27,15 +27,15 @@ func main() {
 		log.Fatal("TELEGRAM_TOKEN not set")
 	}
 
-	pref := telebot.Settings{
+	pref := tb.Settings{
 		Token:  token,
-		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
-		OnError: func(err error, c telebot.Context) {
+		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		OnError: func(err error, c tb.Context) {
 			log.Printf("Error: %v\n", err)
 		},
 	}
 
-	b, err := telebot.NewBot(pref)
+	b, err := tb.NewBot(pref)
 	if err != nil {
 		log.Fatal(err)
 	}
