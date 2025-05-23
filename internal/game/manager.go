@@ -43,6 +43,7 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 
 		Score:     make(map[int64]int),
 		UsedTasks: make(map[string]bool),
+		UserNames: make(map[int64]string),
 
 		mu: sync.Mutex{},
 	}
@@ -66,7 +67,6 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	session.CarrentTask = task
 	session.UsedTasks[task] = true
 	session.UsersPhoto = make(map[int64]string)
-	session.UserNames = make(map[int64]string)
 
 	return nil
 }
