@@ -35,8 +35,19 @@ func NewHandlers(bot BotInterface, gm *game.GameManager, tl *tasks.TasksList) *H
 }
 
 func (h *Handlers) Register() {
-	h.Bot.Handle("/startgame", h.StartGame)
 	h.Bot.Handle("/start", h.Start)
+
+	// Для прод версии
+	// h.Bot.Handle("/startgame", GroupOnly(h.StartGame))
+	// h.Bot.Handle(&h.startRoundBtn, GroupOnly(h.HandleStartRound))
+	// h.Bot.Handle("/newround", GroupOnly(h.HandleStartRound))
+	// h.Bot.Handle(telebot.OnPhoto, GroupOnly(h.TakeUserPhoto))
+	// h.Bot.Handle("/vote", GroupOnly(h.StartVote))
+	// h.Bot.Handle("/finishvote", GroupOnly(h.HandleFinishVote))
+	// h.Bot.Handle("/endgame", GroupOnly(h.HandleEndGame))
+	// h.Bot.Handle("/score", GroupOnly(h.HandleScore))
+
+	h.Bot.Handle("/startgame", h.StartGame)
 	h.Bot.Handle(&h.startRoundBtn, h.HandleStartRound)
 	h.Bot.Handle("/newround", h.HandleStartRound)
 	h.Bot.Handle(telebot.OnPhoto, h.TakeUserPhoto)

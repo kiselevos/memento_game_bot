@@ -14,7 +14,8 @@ type GameSession struct {
 	ChatID    int64            // Номер чата, где идет игра
 	Score     map[int64]int    // Мапа с очками юзеров
 	UsedTasks map[string]bool  // Для отслеживаания используемых вопросов
-	UserNames map[int64]string //Список участников раунда (Для автоматичекого подсчета и окончания раунда?)
+	UserNames map[int64]string //Список участников раунда
+
 	// Обнуляющиеся при новом раунде
 
 	FSM              *FSM             // Машина состояний
