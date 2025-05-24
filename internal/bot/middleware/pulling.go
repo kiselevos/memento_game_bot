@@ -6,7 +6,7 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-// Мидлварь для обработки longpoolinga
+// DropOldMessages - Мидлварь для обработки longpoolinga
 func DropOldMessages(maxAge time.Duration) *telebot.MiddlewarePoller {
 	return telebot.NewMiddlewarePoller(
 		&telebot.LongPoller{Timeout: 10 * time.Second},
