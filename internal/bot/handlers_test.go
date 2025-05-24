@@ -112,3 +112,8 @@ func TestStartRound(t *testing.T) {
 
 	mockBot.AssertCalled(t, "Send", chat, mock.Anything)
 }
+
+func TestTakeUSerPhoto(t *testing.T) {
+	mockBot, handlers, chat, ctx, _ := SetupTestHandler()
+
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"PhotoBattleBot/internal/bot"
+	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/tasks"
@@ -29,7 +30,7 @@ func main() {
 
 	pref := tb.Settings{
 		Token:  token,
-		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		Poller: middleware.DropOldMessages(10 * time.Second),
 		OnError: func(err error, c tb.Context) {
 			log.Printf("Error: %v\n", err)
 		},
