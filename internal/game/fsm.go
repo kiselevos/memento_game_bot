@@ -68,3 +68,8 @@ func SafeTrigger(fsm *FSM, event Event, context string) bool {
 	}
 	return true
 }
+
+// ForceState - для тестирования
+func (f *FSM) ForceState(newState State) {
+	f.current = newState
+}

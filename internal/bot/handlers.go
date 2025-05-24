@@ -157,6 +157,11 @@ func (h *Handlers) StartVote(c telebot.Context) error {
 		return c.Send("На данный момент нет запущенного раунда")
 	}
 
+	// Зашита от нулевого голосования когда никто не скинул фото)
+	if len(session.UsersPhoto) == 0 {
+		return c.Send(messages.NotEnoughPhoto)
+	}
+
 	// // Для честного голосования?
 	// if len(session.UsersPhoto) < 2 {
 	// 	return c.Send(messages.NotEnoughPlayers)
