@@ -1,0 +1,13 @@
+services:
+  postgres:
+    container_name: pbb_postgres
+    image: postgres:16.4
+    env_file:
+      - .env
+    environment: 
+      POSTGRES_USER: photo_bot
+      PGDATA: /data/postgres
+    volumes:
+      - ./postgres-data:/data/postgres
+    ports:
+      - "5433:5432"
