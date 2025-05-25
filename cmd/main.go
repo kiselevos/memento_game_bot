@@ -7,6 +7,7 @@ import (
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/tasks"
+	"PhotoBattleBot/pkg/db"
 	"log"
 	"time"
 
@@ -18,6 +19,8 @@ func main() {
 	logging.InitLogger("bot.log")
 
 	conf := config.LoadConfig()
+
+	database := db.NewDB(conf)
 
 	pref := tb.Settings{
 		Token:  conf.TG.Token,
@@ -39,7 +42,7 @@ func main() {
 	}
 	gm := game.NewGameManager()
 
-	bot.InitRouters(b, gm, tl)
+	bot.InitRouters(b, gm, tl, database)
 
 	log.Println("Bot starts...")
 	b.Start()

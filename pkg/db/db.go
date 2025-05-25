@@ -13,8 +13,8 @@ type Db struct {
 }
 
 // NewDB - создание нового подключения к DB
-func NewDB(conf *config.DbConfig) *Db {
-	db, err := gorm.Open(postgres.Open(conf.Dsn), &gorm.Config{})
+func NewDB(conf *config.Config) *Db {
+	db, err := gorm.Open(postgres.Open(conf.Db.Dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Problem with DB", err)
 	}
