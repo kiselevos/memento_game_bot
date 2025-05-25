@@ -9,8 +9,8 @@ type TaskRepository struct {
 	DataBase *db.Db
 }
 
-func NewTaskRepository(db *db.Db) *UserRepository {
-	return &UserRepository{
+func NewTaskRepository(db *db.Db) *TaskRepository {
+	return &TaskRepository{
 		DataBase: db,
 	}
 }

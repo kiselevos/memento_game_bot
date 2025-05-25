@@ -6,6 +6,7 @@ import (
 	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/logging"
+	"PhotoBattleBot/internal/repositories"
 	"PhotoBattleBot/internal/tasks"
 	"PhotoBattleBot/pkg/db"
 	"log"
@@ -22,6 +23,12 @@ func main() {
 
 	database := db.NewDB(conf)
 
+	// Repository
+	userRepo := repositories.NewUserRepository(database)
+	sessionRepo := repositories.NewSessionRepository(database)
+	taskRepo := repositories.NewTaskRepository(database)
+
+	// Tg settings
 	pref := tb.Settings{
 		Token:  conf.TG.Token,
 		Poller: middleware.DropOldMessages(10 * time.Second),
@@ -42,7 +49,7 @@ func main() {
 	}
 	gm := game.NewGameManager()
 
-	bot.InitRouters(b, gm, tl, database)
+	bot.InitRouters(b, gm, tl, userRepo, sessionRepo, taskRepo)
 
 	log.Println("Bot starts...")
 	b.Start()
