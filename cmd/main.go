@@ -1,16 +1,13 @@
 package main
 
 import (
+	"PhotoBattleBot/config"
 	"PhotoBattleBot/internal/bot"
-	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/tasks"
 	"log"
-	"os"
-	"time"
 
-	"github.com/joho/godotenv"
 	tb "gopkg.in/telebot.v3"
 )
 
@@ -18,25 +15,9 @@ func main() {
 
 	logging.InitLogger("bot.log")
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Problem with .env file")
-	}
+	conf := config.LoadConfig()
 
-	token := os.Getenv("TELEGRAM_TOKEN")
-	if token == "" {
-		log.Fatal("TELEGRAM_TOKEN not set")
-	}
-
-	pref := tb.Settings{
-		Token:  token,
-		Poller: middleware.DropOldMessages(10 * time.Second),
-		OnError: func(err error, c tb.Context) {
-			log.Printf("Error: %v\n", err)
-		},
-	}
-
-	b, err := tb.NewBot(pref)
+	b, err := tb.NewBot(conf.TG.Pref)
 	if err != nil {
 		log.Fatal(err)
 	}
