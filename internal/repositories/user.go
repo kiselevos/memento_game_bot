@@ -32,4 +32,3 @@ func (repo *UserRepository) GetUserByTGID(id uint64) (*models.User, error) {
 	}
 	return &user, nil
 }
-}
