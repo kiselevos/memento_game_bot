@@ -1,14 +1,11 @@
 package config
 
 import (
-	"PhotoBattleBot/internal/bot/middleware"
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
-	"gopkg.in/telebot.v3"
 )
 
 type Config struct {
@@ -22,7 +19,6 @@ type DbConfig struct {
 
 type TgConfig struct {
 	Token string
-	Pref  telebot.Settings
 }
 
 func getDsn() string {
@@ -49,13 +45,6 @@ func LoadConfig() *Config {
 	return &Config{
 		TG: TgConfig{
 			Token: token,
-			Pref: telebot.Settings{
-				Token:  token,
-				Poller: middleware.DropOldMessages(10 * time.Second),
-				OnError: func(err error, c telebot.Context) {
-					log.Printf("Error: %v\n", err)
-				},
-			},
 		},
 		Db: DbConfig{
 			Dsn: getDsn(),

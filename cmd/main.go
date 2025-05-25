@@ -3,10 +3,12 @@ package main
 import (
 	"PhotoBattleBot/config"
 	"PhotoBattleBot/internal/bot"
+	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/tasks"
 	"log"
+	"time"
 
 	tb "gopkg.in/telebot.v3"
 )
@@ -17,7 +19,15 @@ func main() {
 
 	conf := config.LoadConfig()
 
-	b, err := tb.NewBot(conf.TG.Pref)
+	pref := tb.Settings{
+		Token:  conf.TG.Token,
+		Poller: middleware.DropOldMessages(10 * time.Second),
+		OnError: func(err error, c tb.Context) {
+			log.Printf("Error: %v\n", err)
+		},
+	}
+
+	b, err := tb.NewBot(pref)
 	if err != nil {
 		log.Fatal(err)
 	}
