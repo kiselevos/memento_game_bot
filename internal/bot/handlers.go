@@ -3,7 +3,6 @@ package bot
 import (
 	messages "PhotoBattleBot/assets"
 	"PhotoBattleBot/internal/game"
-	"PhotoBattleBot/internal/repositories"
 	"PhotoBattleBot/internal/tasks"
 	"fmt"
 	"log"
@@ -17,9 +16,6 @@ type Handlers struct {
 	Bot         BotInterface // Меняем на интерфейс для моков
 	GameManager *game.GameManager
 	TasksList   *tasks.TasksList
-	UserRepo    *repositories.UserRepository
-	SessionRepo *repositories.SessionRepository
-	TaskRepo    *repositories.TaskRepository
 
 	startRoundBtn telebot.InlineButton
 }
@@ -27,17 +23,11 @@ type Handlers struct {
 // NewHandlers создание нового хендлера через контруктор
 func NewHandlers(bot BotInterface,
 	gm *game.GameManager,
-	tl *tasks.TasksList,
-	userRepo *repositories.UserRepository,
-	sessionRepo *repositories.SessionRepository,
-	taskRepo *repositories.TaskRepository) *Handlers {
+	tl *tasks.TasksList) *Handlers {
 	h := &Handlers{
 		Bot:         bot,
 		GameManager: gm,
 		TasksList:   tl,
-		UserRepo:    userRepo,
-		TaskRepo:    taskRepo,
-		SessionRepo: sessionRepo,
 	}
 	h.startRoundBtn = telebot.InlineButton{
 		Unique: "start_round",

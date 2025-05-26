@@ -1,6 +1,7 @@
 package game
 
 import (
+	"PhotoBattleBot/internal/repositories"
 	"fmt"
 	"log"
 	"sync"
@@ -12,13 +13,24 @@ import (
 type GameManager struct {
 	sessions map[int64]*GameSession
 	mu       sync.Mutex
+
+	UserRepo    *repositories.UserRepository
+	SessionRepo *repositories.SessionRepository
+	TaskRepo    *repositories.TaskRepository
 }
 
 // NewGameManager создаёт и возвращает новый экземпляр GameManager
-func NewGameManager() *GameManager {
+func NewGameManager(
+	userRepo *repositories.UserRepository,
+	sessionRepo *repositories.SessionRepository,
+	taskRepo *repositories.TaskRepository) *GameManager {
 	return &GameManager{
 		sessions: make(map[int64]*GameSession),
 		mu:       sync.Mutex{},
+
+		UserRepo:    userRepo,
+		SessionRepo: sessionRepo,
+		TaskRepo:    taskRepo,
 	}
 }
 

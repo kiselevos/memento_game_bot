@@ -47,9 +47,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	gm := game.NewGameManager()
+	gm := game.NewGameManager(userRepo, sessionRepo, taskRepo)
 
-	bot.InitRouters(b, gm, tl, userRepo, sessionRepo, taskRepo)
+	bot.InitRouters(b, gm, tl)
 
 	log.Println("Bot starts...")
 	b.Start()
