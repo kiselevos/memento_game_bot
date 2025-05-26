@@ -74,15 +74,45 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	return session
 }
 
+// Сбор статистики task
+func (gm *GameManager) saveTaskStats(session *GameSession) {
+	prevTask := session.CarrentTask
+	if prevTask == "" {
+		return
+	}
+	if len(session.UsersPhoto) > 0 {
+		err := gm.TaskRepo.AddUseCount(prevTask)
+		if err != nil {
+			log.Printf("[ERROR] Ошибка добавления use_count_task в базу данных %v", err)
+		}
+	} else {
+		err := gm.TaskRepo.AddSkipCount(prevTask)
+		if err != nil {
+			log.Printf("[ERROR] Ошибка добавления skip_count_task в базу данных %v", err)
+		}
+	}
+}
+
 // StartNewRound - запускает новый раунд в текущей сессии
 func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
+	gm.saveTaskStats(session)
+
 	log.Printf("[GAME] Новый раунд запущен в чате %d", session.ChatID)
 
 	if !SafeTrigger(session.FSM, EventStartRound, "StartNewRound") {
 		return fmt.Errorf("Ошибка перехода FSM")
+	}
+
+	t, err := gm.TaskRepo.GetTaskByText(task)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		t = models.NewTask(task)
+		_, err = gm.TaskRepo.Create(t)
+		if err != nil {
+			log.Printf("[ERROR] Не удалось добавить task %s: %v", task, err)
+		}
 	}
 
 	session.CarrentTask = task
