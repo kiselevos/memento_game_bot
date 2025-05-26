@@ -1,12 +1,15 @@
 package game
 
 import (
+	"PhotoBattleBot/internal/models"
 	"PhotoBattleBot/internal/repositories"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
 
 	"gopkg.in/telebot.v3"
+	"gorm.io/gorm"
 )
 
 // GameManager - управляет активными игровыми сессиями
@@ -62,6 +65,12 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 
 	gm.sessions[chatID] = session
 
+	// Запись статистики в БД
+	_, err := gm.SessionRepo.Create(&models.Session{ChatID: chatID})
+	if err != nil {
+		log.Printf("[ERROR] сессия %d не сохранена в базу данных %v", chatID, err)
+	}
+
 	return session
 }
 
@@ -89,6 +98,29 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 	defer gm.mu.Unlock()
 
 	session, _ := gm.sessions[chatID]
+
+	if _, exist := session.UserNames[user.ID]; !exist {
+
+		u, err := gm.UserRepo.GetUserByTGID(user.ID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			u = models.NewUser(user.ID, user.Username, user.FirstName)
+			_, err = gm.UserRepo.Create(u)
+			if err != nil {
+				log.Printf("[ERROR] Не удалось создать пользователя %d: %v", user.ID, err)
+			}
+		}
+
+		s, err := gm.SessionRepo.GetSessionByID(chatID)
+		if err != nil {
+			log.Printf("[ERROR] Не удалось найти сессию %d: %v", chatID, err)
+		}
+
+		err = gm.SessionRepo.AddUserToSession(s, u)
+		if err != nil {
+			log.Printf("[ERROR] Не удалось привязать пользователя %d к сессии %d: %v", user.ID, chatID, err)
+		}
+	}
+
 	session.TakePhoto(user, photoID)
 }
 

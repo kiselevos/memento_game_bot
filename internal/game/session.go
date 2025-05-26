@@ -76,9 +76,12 @@ func (s *GameSession) TakePhoto(user *telebot.User, photoID string) {
 	s.UsersPhoto[user.ID] = photoID
 
 	// TODO: Собрать фидбэк по поводу имен. Как лучше?
-	if user.Username != "" {
-		s.UserNames[user.ID] = "@" + user.Username
-	} else {
-		s.UserNames[user.ID] = user.FirstName
+
+	if _, ok := s.UserNames[user.ID]; !ok {
+		if user.Username != "" {
+			s.UserNames[user.ID] = "@" + user.Username
+		} else {
+			s.UserNames[user.ID] = user.FirstName
+		}
 	}
 }

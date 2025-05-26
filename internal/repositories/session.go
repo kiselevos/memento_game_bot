@@ -22,3 +22,18 @@ func (repo *SessionRepository) Create(session *models.Session) (*models.Session,
 	}
 	return session, nil
 }
+
+func (repo *SessionRepository) GetSessionByID(sessionID int64) (*models.Session, error) {
+
+	var session models.Session
+	result := repo.DataBase.DB.First(&session, "chat_id = ?", sessionID)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &session, nil
+}
+
+// AddUserToSession - many to many table
+func (repo *SessionRepository) AddUserToSession(session *models.Session, user *models.User) error {
+	return repo.DataBase.Model(session).Association("Users").Append(user)
+}

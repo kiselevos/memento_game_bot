@@ -23,10 +23,10 @@ func (repo *UserRepository) Create(user *models.User) (*models.User, error) {
 	return user, nil
 }
 
-func (repo *UserRepository) GetUserByTGID(id uint64) (*models.User, error) {
+func (repo *UserRepository) GetUserByTGID(id int64) (*models.User, error) {
 
 	var user models.User
-	result := repo.DataBase.DB.First(&user, "TgUserId = ?", id)
+	result := repo.DataBase.DB.First(&user, "tg_user_id = ?", id)
 	if result.Error != nil {
 		return nil, result.Error
 	}

@@ -1,62 +1,69 @@
 package bot
 
-import (
-	"github.com/stretchr/testify/mock"
-	tb "gopkg.in/telebot.v3"
-)
+// import (
+// 	messages "PhotoBattleBot/assets"
+// 	"PhotoBattleBot/internal/game"
+// 	"PhotoBattleBot/internal/tasks"
+// 	"strings"
+// 	"testing"
 
-type MockBot struct {
-	mock.Mock
-}
+// 	"github.com/stretchr/testify/assert"
+// 	"github.com/stretchr/testify/mock"
+// 	tb "gopkg.in/telebot.v3"
+// )
 
-func (m *MockBot) Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error) {
-	args := m.Called(to, what)
-	return &tb.Message{}, args.Error(1)
-}
+// type MockBot struct {
+// 	mock.Mock
+// }
 
-func (m *MockBot) Delete(msg tb.Editable) error {
-	args := m.Called(msg)
-	return args.Error(0)
-}
+// func (m *MockBot) Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error) {
+// 	args := m.Called(to, what)
+// 	return &tb.Message{}, args.Error(1)
+// }
 
-func (m *MockBot) Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error {
-	args := m.Called(c, resp)
-	return args.Error(0)
-}
+// func (m *MockBot) Delete(msg tb.Editable) error {
+// 	args := m.Called(msg)
+// 	return args.Error(0)
+// }
 
-func (m *MockBot) Handle(endpoint interface{}, handler tb.HandlerFunc, middlewear ...tb.MiddlewareFunc) {
-	m.Called(endpoint, handler)
-}
+// func (m *MockBot) Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error {
+// 	args := m.Called(c, resp)
+// 	return args.Error(0)
+// }
 
-type mockContext struct {
-	tb.Context
-	chat    *tb.Chat
-	message *tb.Message
-	sender  *tb.User
-	mockBot *MockBot
-}
+// func (m *MockBot) Handle(endpoint interface{}, handler tb.HandlerFunc, middlewear ...tb.MiddlewareFunc) {
+// 	m.Called(endpoint, handler)
+// }
 
-func (m *mockContext) Chat() *tb.Chat {
-	return m.chat
-}
+// type mockContext struct {
+// 	tb.Context
+// 	chat    *tb.Chat
+// 	message *tb.Message
+// 	sender  *tb.User
+// 	mockBot *MockBot
+// }
 
-func (m *mockContext) Message() *tb.Message {
-	return m.message
-}
+// func (m *mockContext) Chat() *tb.Chat {
+// 	return m.chat
+// }
 
-// имитируем успешную отправку
-func (m *mockContext) Send(what interface{}, _ ...interface{}) error {
-	_, err := m.mockBot.Send(m.chat, what)
-	return err
-}
+// func (m *mockContext) Message() *tb.Message {
+// 	return m.message
+// }
 
-func (m *mockContext) Sender() *tb.User {
-	return m.sender
-}
+// // имитируем успешную отправку
+// func (m *mockContext) Send(what interface{}, _ ...interface{}) error {
+// 	_, err := m.mockBot.Send(m.chat, what)
+// 	return err
+// }
 
-func (m *mockContext) Callback() *tb.Callback {
-	return nil
-}
+// func (m *mockContext) Sender() *tb.User {
+// 	return m.sender
+// }
+
+// func (m *mockContext) Callback() *tb.Callback {
+// 	return nil
+// }
 
 // func SetupTestHandler() (*MockBot, *Handlers, *tb.Chat, *mockContext, *game.GameSession) {
 
