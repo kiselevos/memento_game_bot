@@ -37,3 +37,13 @@ func (repo *SessionRepository) GetSessionByID(sessionID int64) (*models.Session,
 func (repo *SessionRepository) AddUserToSession(session *models.Session, user *models.User) error {
 	return repo.DataBase.Model(session).Association("Users").Append(user)
 }
+
+func (repo *SessionRepository) AddPhotosCount(session *models.Session) error {
+	session.PhotosCount++
+	result := repo.DataBase.Save(session)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}

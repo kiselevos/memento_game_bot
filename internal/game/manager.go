@@ -99,6 +99,16 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 
 	session, _ := gm.sessions[chatID]
 
+	s, err := gm.SessionRepo.GetSessionByID(chatID)
+	if err != nil {
+		log.Printf("[ERROR] Не удалось найти сессию %d: %v", chatID, err)
+	}
+
+	err = gm.SessionRepo.AddPhotosCount(s)
+	if err != nil {
+		log.Printf("[ERROR] Не удалось увеличить PhotosCount %d: %v", chatID, err)
+	}
+
 	if _, exist := session.UserNames[user.ID]; !exist {
 
 		u, err := gm.UserRepo.GetUserByTGID(user.ID)
@@ -108,11 +118,6 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 			if err != nil {
 				log.Printf("[ERROR] Не удалось создать пользователя %d: %v", user.ID, err)
 			}
-		}
-
-		s, err := gm.SessionRepo.GetSessionByID(chatID)
-		if err != nil {
-			log.Printf("[ERROR] Не удалось найти сессию %d: %v", chatID, err)
 		}
 
 		err = gm.SessionRepo.AddUserToSession(s, u)

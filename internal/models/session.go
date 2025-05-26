@@ -6,7 +6,7 @@ type Session struct {
 	gorm.Model
 	ChatID      int64   `gorm:"column:chat_id"`
 	Users       []*User `gorm:"many2many:session_users;"`
-	RoundsCount int     `gorm:"column:rounds_count"` // Количество сыграных раундов (добавлена хоть одна фотография)
+	PhotosCount int     `gorm:"column:photos_count"` // Количество фото, сыграных в сессии,
 }
 
 func NewSession(chatID int64) *Session {
