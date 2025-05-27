@@ -1,6 +1,7 @@
 package game
 
 import (
+	messages "PhotoBattleBot/assets"
 	"PhotoBattleBot/internal/models"
 	"PhotoBattleBot/internal/repositories"
 	"errors"
@@ -191,6 +192,65 @@ func (gm *GameManager) StartVoting(session *GameSession) error {
 
 	session.Votes = make(map[int64]int64)
 	return nil
+}
+
+// VoteResult спец тип для ответов или CallBack или Messages
+type VoteResult struct {
+	Message    string
+	IsCallback bool
+	IsError    bool
+}
+
+func (gm *GameManager) RegisterVote(chatID int64, voter *telebot.User, photoNum int) (*VoteResult, error) {
+
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+
+	session, exist := gm.sessions[chatID]
+	if !exist || session.FSM.Current() != VoteState {
+		return &VoteResult{
+			Message:    messages.VotedEarler,
+			IsCallback: true,
+		}, nil
+	}
+
+	if _, voted := session.Votes[voter.ID]; voted {
+		return &VoteResult{
+			Message:    messages.VotedAlready,
+			IsCallback: true,
+		}, nil
+	}
+
+	targetUserID, ok := session.IndexPhotoToUser[photoNum]
+	if !ok {
+		log.Printf("[ERROR] Неизвестный номер фото %d в чате %d", photoNum, chatID)
+		return &VoteResult{
+			Message:    messages.ErrorMessagesForUser,
+			IsCallback: true,
+			IsError:    true,
+		}, fmt.Errorf("unknown photo")
+	}
+
+	// if targetUserID == voter.ID {
+	// return &VoteResult{
+	// 		Message:    messages.VotedForSelf,
+	// 		IsCallback: true,
+	// 	}, nil
+	// }
+
+	session.Votes[voter.ID] = targetUserID
+	session.Score[targetUserID]++
+
+	// Запись статистики
+	err := gm.UserRepo.AddUserStatistic(voter.ID, repositories.StatVote)
+	if err != nil {
+		log.Printf("[DB ERROR] Не удалось добавить голос для %d: %v", voter.ID, err)
+	}
+
+	return &VoteResult{
+		Message:    fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID)),
+		IsCallback: false,
+	}, nil
 }
 
 func (gm *GameManager) FinishVoting(session *GameSession) {

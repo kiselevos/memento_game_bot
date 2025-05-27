@@ -222,44 +222,19 @@ func (h *Handlers) HandleVote(c telebot.Context, chatID int64, photoNum int) err
 
 	voter := c.Sender()
 
-	session, exist := h.GameManager.GetSession(chatID)
-	if !exist || session.FSM.Current() != game.VoteState {
-		return c.Respond(&telebot.CallbackResponse{
-			Text: messages.VotedEarler,
-		})
+	result, err := h.GameManager.RegisterVote(chatID, voter, photoNum)
+	if err != nil && result.IsCallback {
+		_ = c.Respond(&telebot.CallbackResponse{Text: result.Message})
+		return nil
 	}
 
-	if _, voted := session.Votes[voter.ID]; voted {
-		return c.Respond(&telebot.CallbackResponse{
-			Text: messages.VotedAlready,
-		})
+	if result.IsCallback {
+		return c.Respond(&telebot.CallbackResponse{Text: result.Message})
 	}
 
-	targetUserID, exists := session.IndexPhotoToUser[photoNum]
-	if !exists {
-		log.Printf("[ERROR] Hеизвестный номер фото для голосования! Номер чата: %d\n", chatID)
-		return c.Respond(&telebot.CallbackResponse{
-			Text: "Упсс... Ошибка уже направлена разработчику. Спасибо!",
-		})
-	}
+	_ = c.Respond(&telebot.CallbackResponse{Text: messages.VotedReceived})
 
-	// if targetUserID == voter.ID {
-	// 	return c.Respond(&telebot.CallbackResponse{
-	// 		Text: "За себя голосовать не честно!",
-	// 	})
-	// }
-
-	session.Votes[voter.ID] = targetUserID
-	session.Score[targetUserID]++
-
-	err := c.Respond(&telebot.CallbackResponse{
-		Text: messages.VotedReceived,
-	})
-	if err != nil {
-		return err
-	}
-
-	return c.Send(fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID)))
+	return c.Send(result.Message)
 }
 
 func (h *Handlers) FinishVoting(chatID int64, session *game.GameSession) {
