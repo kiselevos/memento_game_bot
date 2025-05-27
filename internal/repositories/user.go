@@ -5,6 +5,12 @@ import (
 	"PhotoBattleBot/pkg/db"
 )
 
+const (
+	StatGame  = "game"
+	StatVote  = "vote"
+	StatPhoto = "photo"
+)
+
 type UserRepository struct {
 	DataBase *db.Db
 }
@@ -31,4 +37,29 @@ func (repo *UserRepository) GetUserByTGID(id int64) (*models.User, error) {
 		return nil, result.Error
 	}
 	return &user, nil
+}
+
+// AddUserStatistic - единая функция для увеличения показателей
+func (repo *UserRepository) AddUserStatistic(userID int64, flag string) error {
+
+	user, err := repo.GetUserByTGID(userID)
+	if err != nil {
+		return err
+	}
+
+	switch flag {
+	case StatVote:
+		user.UsersVote++
+	case StatGame:
+		user.GamesPlayed++
+	case StatPhoto:
+		user.PhotosSent++
+	}
+
+	result := repo.DataBase.Save(user)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
 }

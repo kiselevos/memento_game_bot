@@ -68,7 +68,7 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	// Запись статистики в БД
 	_, err := gm.SessionRepo.Create(&models.Session{ChatID: chatID})
 	if err != nil {
-		log.Printf("[ERROR] сессия %d не сохранена в базу данных %v", chatID, err)
+		log.Printf("[DB ERROR] сессия %d не сохранена в базу данных %v", chatID, err)
 	}
 
 	return session
@@ -83,12 +83,12 @@ func (gm *GameManager) saveTaskStats(session *GameSession) {
 	if len(session.UsersPhoto) > 0 {
 		err := gm.TaskRepo.AddUseCount(prevTask)
 		if err != nil {
-			log.Printf("[ERROR] Ошибка добавления use_count_task в базу данных %v", err)
+			log.Printf("[DB ERROR] Ошибка добавления use_count_task в базу данных %v", err)
 		}
 	} else {
 		err := gm.TaskRepo.AddSkipCount(prevTask)
 		if err != nil {
-			log.Printf("[ERROR] Ошибка добавления skip_count_task в базу данных %v", err)
+			log.Printf("[DB ERROR] Ошибка добавления skip_count_task в базу данных %v", err)
 		}
 	}
 }
@@ -111,7 +111,7 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 		t = models.NewTask(task)
 		_, err = gm.TaskRepo.Create(t)
 		if err != nil {
-			log.Printf("[ERROR] Не удалось добавить task %s: %v", task, err)
+			log.Printf("[DB ERROR] Не удалось добавить task %s: %v", task, err)
 		}
 	}
 
@@ -122,6 +122,41 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	return nil
 }
 
+func (gm *GameManager) addSessionUserIfNotExist(session *GameSession, user *telebot.User) {
+	if _, exist := session.UserNames[user.ID]; exist {
+		return
+	}
+
+	chatID := session.ChatID
+	userID := user.ID
+
+	u, err := gm.UserRepo.GetUserByTGID(userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		u = models.NewUser(userID, user.Username, user.FirstName)
+		_, err = gm.UserRepo.Create(u)
+		if err != nil {
+			log.Printf("[DB ERROR] Не удалось создать пользователя %d: %v", userID, err)
+		}
+	}
+
+	s, err := gm.SessionRepo.GetSessionByID(chatID)
+	if err != nil {
+		log.Printf("[DB ERROR] Не удалось найти сессию в БД. Чат %d: %v", chatID, err)
+		return
+	}
+
+	err = gm.SessionRepo.AddUserToSession(s, u)
+	if err != nil {
+		log.Printf("[DB ERROR] Не удалось привязать пользователя %d к сессии %d: %v", userID, chatID, err)
+	}
+
+	err = gm.UserRepo.AddUserStatistic(user.ID, repositories.StatGame)
+	if err != nil {
+		log.Printf("[DB ERROR] Не удалось добавить игру участнику %d в сессии %d: %v", userID, chatID, err)
+	}
+
+}
+
 func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID string) {
 
 	gm.mu.Lock()
@@ -129,31 +164,16 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 
 	session, _ := gm.sessions[chatID]
 
-	s, err := gm.SessionRepo.GetSessionByID(chatID)
+	gm.addSessionUserIfNotExist(session, user)
+
+	err := gm.SessionRepo.AddPhotosCount(chatID)
 	if err != nil {
-		log.Printf("[ERROR] Не удалось найти сессию %d: %v", chatID, err)
+		log.Printf("[DB ERROR] Не удалось увеличить PhotosCount %d: %v", chatID, err)
 	}
 
-	err = gm.SessionRepo.AddPhotosCount(s)
+	err = gm.UserRepo.AddUserStatistic(user.ID, repositories.StatPhoto)
 	if err != nil {
-		log.Printf("[ERROR] Не удалось увеличить PhotosCount %d: %v", chatID, err)
-	}
-
-	if _, exist := session.UserNames[user.ID]; !exist {
-
-		u, err := gm.UserRepo.GetUserByTGID(user.ID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			u = models.NewUser(user.ID, user.Username, user.FirstName)
-			_, err = gm.UserRepo.Create(u)
-			if err != nil {
-				log.Printf("[ERROR] Не удалось создать пользователя %d: %v", user.ID, err)
-			}
-		}
-
-		err = gm.SessionRepo.AddUserToSession(s, u)
-		if err != nil {
-			log.Printf("[ERROR] Не удалось привязать пользователя %d к сессии %d: %v", user.ID, chatID, err)
-		}
+		log.Printf("[DB ERROR] Не удалось добавить фото участнику %d в сессии %d: %v", user.ID, chatID, err)
 	}
 
 	session.TakePhoto(user, photoID)

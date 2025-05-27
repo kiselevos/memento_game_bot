@@ -38,7 +38,12 @@ func (repo *SessionRepository) AddUserToSession(session *models.Session, user *m
 	return repo.DataBase.Model(session).Association("Users").Append(user)
 }
 
-func (repo *SessionRepository) AddPhotosCount(session *models.Session) error {
+func (repo *SessionRepository) AddPhotosCount(chatID int64) error {
+
+	session, err := repo.GetSessionByID(chatID)
+	if err != nil {
+		return err
+	}
 	session.PhotosCount++
 	result := repo.DataBase.Save(session)
 	if result.Error != nil {
