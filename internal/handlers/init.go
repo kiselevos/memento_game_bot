@@ -26,12 +26,12 @@ func NewHandlers(
 ) *Handlers {
 
 	h := &Handlers{
-		Game:     NewGameHandlers(bot, gm, tl),
+		Game:     NewGameHandlers(bot, gm),
 		Round:    NewRoundHandlers(bot, gm, tl),
-		Vote:     NewVoteHandlers(bot, gm, tl),
-		Score:    NewScoreHandlers(bot, gm, tl),
+		Vote:     NewVoteHandlers(bot, gm),
+		Score:    NewScoreHandlers(bot, gm),
 		Feedback: NewFeedbackHandler(bot, fm, adminsID, botName),
-		Photo:    NewPhotoHandlers(bot, gm, tl),
+		Photo:    NewPhotoHandlers(bot, gm),
 	}
 
 	h.Round.GameHandlers = h.Game

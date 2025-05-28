@@ -71,7 +71,7 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser)
 	}
 
-	text := messages.RoundStartedMessage + "\n" + task
+	text := messages.RoundStartedMessage + "\n" + "***" + task + "***"
 
 	btn := rh.startRoundBtn
 	btn.Text = "🔁 Поменять задание"
@@ -79,5 +79,5 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{btn}}
 
-	return c.Send(text, markup)
+	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
 }

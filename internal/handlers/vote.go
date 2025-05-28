@@ -5,7 +5,6 @@ import (
 	"PhotoBattleBot/internal/bot"
 	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
-	"PhotoBattleBot/internal/tasks"
 	"fmt"
 	"log"
 	"time"
@@ -16,17 +15,15 @@ import (
 type VoteHandlers struct {
 	Bot         botinterface.BotInterface
 	GameManager *game.GameManager
-	TasksList   *tasks.TasksList
 
 	startRoundBtn telebot.InlineButton
 }
 
-func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *tasks.TasksList) *VoteHandlers {
+func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager) *VoteHandlers {
 
 	h := &VoteHandlers{
 		Bot:         bot,
 		GameManager: gm,
-		TasksList:   tl,
 	}
 	h.startRoundBtn = telebot.InlineButton{
 		Unique: "start_round",

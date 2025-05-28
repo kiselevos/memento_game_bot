@@ -4,8 +4,8 @@ import (
 	messages "PhotoBattleBot/assets"
 	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
-	"PhotoBattleBot/internal/tasks"
 	"fmt"
+	"strings"
 
 	"gopkg.in/telebot.v3"
 )
@@ -13,22 +13,15 @@ import (
 type PhotoHandlers struct {
 	Bot         botinterface.BotInterface
 	GameManager *game.GameManager
-	TasksList   *tasks.TasksList
-
-	startRoundBtn telebot.InlineButton
 }
 
-func NewPhotoHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *tasks.TasksList) *PhotoHandlers {
+func NewPhotoHandlers(bot botinterface.BotInterface, gm *game.GameManager) *PhotoHandlers {
 
 	h := &PhotoHandlers{
 		Bot:         bot,
 		GameManager: gm,
-		TasksList:   tl,
 	}
-	h.startRoundBtn = telebot.InlineButton{
-		Unique: "start_round",
-		Text:   "Начать раунд",
-	}
+
 	return h
 }
 
@@ -66,6 +59,12 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	}
 
 	ph.GameManager.TakePhoto(chat.ID, user, fileID)
+
+	// Удаляем фото только если блиц.
+	if strings.HasPrefix(session.CarrentTask, "[БЛИЦ]") {
+		_ = ph.Bot.Delete(c.Message())
+		return c.Send(fmt.Sprintf("%s, %s", session.GetUserName(user.ID), messages.BlitsPhotoReceived))
+	}
 
 	return c.Send(fmt.Sprintf("%s, %s", session.GetUserName(user.ID), messages.PhotoReceived))
 }

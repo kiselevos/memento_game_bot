@@ -5,7 +5,6 @@ import (
 	"PhotoBattleBot/internal/bot"
 	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
-	"PhotoBattleBot/internal/tasks"
 
 	"gopkg.in/telebot.v3"
 )
@@ -13,17 +12,15 @@ import (
 type ScoreHandlers struct {
 	Bot         botinterface.BotInterface
 	GameManager *game.GameManager
-	TasksList   *tasks.TasksList
 
 	startRoundBtn telebot.InlineButton
 }
 
-func NewScoreHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *tasks.TasksList) *ScoreHandlers {
+func NewScoreHandlers(bot botinterface.BotInterface, gm *game.GameManager) *ScoreHandlers {
 
 	sh := &ScoreHandlers{
 		Bot:         bot,
 		GameManager: gm,
-		TasksList:   tl,
 	}
 	sh.startRoundBtn = telebot.InlineButton{
 		Unique: "start_round",
