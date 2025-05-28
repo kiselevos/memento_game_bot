@@ -2,10 +2,10 @@ package main
 
 import (
 	"PhotoBattleBot/config"
-	"PhotoBattleBot/internal/bot"
 	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/feedback"
 	"PhotoBattleBot/internal/game"
+	"PhotoBattleBot/internal/handlers"
 	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/repositories"
 	"PhotoBattleBot/internal/tasks"
@@ -53,8 +53,8 @@ func main() {
 	gm := game.NewGameManager(userRepo, sessionRepo, taskRepo)
 	fm := feedback.NewFeedbackManager(10 * time.Minute)
 
-	bot.InitRouters(b, gm, tl)
-	feedback.InitRouters(b, fm, conf.Admin.AdminsID, botUsername)
+	h := handlers.NewHandlers(b, fm, conf.Admin.AdminsID, botUsername, gm, tl)
+	h.RegisterAll()
 
 	log.Println("Bot starts...")
 	b.Start()
