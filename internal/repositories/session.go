@@ -16,6 +16,11 @@ func NewSessionRepository(db *db.Db) *SessionRepository {
 }
 
 func (repo *SessionRepository) Create(session *models.Session) (*models.Session, error) {
+	repo.DataBase.
+		Model(&models.Session{}).
+		Where("chat_id = ?", session.ChatID).
+		Update("is_active", false)
+
 	result := repo.DataBase.DB.Create(session)
 	if result.Error != nil {
 		return nil, result.Error
@@ -23,14 +28,30 @@ func (repo *SessionRepository) Create(session *models.Session) (*models.Session,
 	return session, nil
 }
 
-func (repo *SessionRepository) GetSessionByID(sessionID int64) (*models.Session, error) {
+func (repo *SessionRepository) GetSessionByID(chatID int64) (*models.Session, error) {
 
 	var session models.Session
-	result := repo.DataBase.DB.First(&session, "chat_id = ?", sessionID)
+	result := repo.DataBase.
+		Where("chat_id = ? AND is_active = true", chatID).
+		First(&session)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	return &session, nil
+}
+
+func (repo *SessionRepository) ChangeIsActive(chatID int64) error {
+	session, err := repo.GetSessionByID(chatID)
+	if err != nil {
+		return err
+	}
+	session.IsActive = false
+	result := repo.DataBase.Save(session)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
 }
 
 // AddUserToSession - many to many table

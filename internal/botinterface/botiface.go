@@ -1,4 +1,4 @@
-package bot
+package botinterface
 
 import (
 	"gopkg.in/telebot.v3"

@@ -2,6 +2,7 @@ package bot
 
 import (
 	messages "PhotoBattleBot/assets"
+	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/tasks"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 
 // Handlers структура хранящая в себе bot и GameManager для роутинга
 type Handlers struct {
-	Bot         BotInterface // Меняем на интерфейс для моков
+	Bot         botinterface.BotInterface // Меняем на интерфейс для моков
 	GameManager *game.GameManager
 	TasksList   *tasks.TasksList
 
@@ -21,7 +22,7 @@ type Handlers struct {
 }
 
 // NewHandlers создание нового хендлера через контруктор
-func NewHandlers(bot BotInterface,
+func NewHandlers(bot botinterface.BotInterface,
 	gm *game.GameManager,
 	tl *tasks.TasksList) *Handlers {
 	h := &Handlers{

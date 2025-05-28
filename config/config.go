@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Db DbConfig
-	TG TgConfig
+	Db    DbConfig
+	TG    TgConfig
+	Admin AdminsConfig
 }
 
 type DbConfig struct {
@@ -19,6 +22,10 @@ type DbConfig struct {
 
 type TgConfig struct {
 	Token string
+}
+
+type AdminsConfig struct {
+	AdminsID []int64
 }
 
 func GetDsn() string {
@@ -34,6 +41,42 @@ func GetDsn() string {
 		os.Getenv("DB_NAME"),
 		os.Getenv("DB_PORT"),
 	)
+}
+
+// LoadAminsID достаем IDшники админов из env
+func LoadAminsID() []int64 {
+
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Println("Problem with load configs .env file. Using default config", err)
+	}
+
+	raw := os.Getenv("ADMINS_ID")
+	if raw == "" {
+		log.Println("ADMINS_ID is not set")
+		return nil
+	}
+
+	admins := strings.Split(raw, ",")
+	var res []int64
+
+	for _, strID := range admins {
+		strID = strings.TrimSpace(strID)
+		if strID == "" {
+			continue
+		}
+
+		id, err := strconv.Atoi(strID)
+		if err != nil {
+			log.Printf("invalid admin ID '%s': %v", strID, err)
+			continue
+		}
+
+		res = append(res, int64(id))
+	}
+
+	return res
+
 }
 
 func LoadConfig() *Config {
@@ -54,6 +97,9 @@ func LoadConfig() *Config {
 		},
 		Db: DbConfig{
 			Dsn: GetDsn(),
+		},
+		Admin: AdminsConfig{
+			AdminsID: LoadAminsID(),
 		},
 	}
 }

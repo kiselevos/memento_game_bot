@@ -4,6 +4,7 @@ import (
 	"PhotoBattleBot/config"
 	"PhotoBattleBot/internal/bot"
 	"PhotoBattleBot/internal/bot/middleware"
+	"PhotoBattleBot/internal/feedback"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/logging"
 	"PhotoBattleBot/internal/repositories"
@@ -42,14 +43,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	botUsername := b.Me.Username
+
 	// Инициализация GameManager
 	tl, err := tasks.NewTasksList("assets/tasks.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	gm := game.NewGameManager(userRepo, sessionRepo, taskRepo)
+	fm := feedback.NewFeedbackManager(10 * time.Minute)
 
 	bot.InitRouters(b, gm, tl)
+	feedback.InitRouters(b, fm, conf.Admin.AdminsID, botUsername)
 
 	log.Println("Bot starts...")
 	b.Start()

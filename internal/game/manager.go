@@ -67,7 +67,7 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	gm.sessions[chatID] = session
 
 	// Запись статистики в БД
-	_, err := gm.SessionRepo.Create(&models.Session{ChatID: chatID})
+	_, err := gm.SessionRepo.Create(&models.Session{ChatID: chatID, IsActive: true})
 	if err != nil {
 		log.Printf("[DB ERROR] сессия %d не сохранена в базу данных %v", chatID, err)
 	}
