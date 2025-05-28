@@ -28,6 +28,11 @@ func NewFeedbackHandler(bot botinterface.BotInterface, fm *feedback.FeedbackMana
 
 func (fh *FeedbackHandlers) Register() {
 	fh.Bot.Handle("/feedback", fh.HandleStartFeedback)
+
+	fh.Bot.Handle(telebot.OnText, fh.HandelFeedbackText)
+
+	cancelBtn := &telebot.InlineButton{Unique: "cancel_feedback"}
+	fh.Bot.Handle(cancelBtn, fh.HandelCancelFeedback)
 }
 
 func (fh *FeedbackHandlers) HandleStartFeedback(c telebot.Context) error {
@@ -64,6 +69,12 @@ func (fh *FeedbackHandlers) HandelCancelFeedback(c telebot.Context) error {
 
 	fh.FeedbackManager.CancelFeedback(userID)
 
+	if err := c.Respond(&telebot.CallbackResponse{
+		Text: "Отзыв отменён.",
+	}); err != nil {
+		log.Println("Не удалось отправить callback response:", err)
+	}
+
 	return c.Edit("Отправка отзыва отменена.")
 }
 
@@ -83,12 +94,13 @@ func (fh *FeedbackHandlers) HandelFeedbackText(c telebot.Context) error {
 
 	for _, adminID := range fh.AdminsID {
 		adminMsg := fmt.Sprintf("📬 Новый отзыв от @%s (%d):\n\n%s", c.Sender().Username, userID, c.Text())
+		log.Println("[INFO]" + adminMsg)
 		if _, err := fh.Bot.Send(&telebot.User{ID: adminID}, adminMsg); err != nil {
 			log.Println("[ERROR] Проблема с отравкой ообщения после отзыва:", err)
 		}
 	}
 
-	// TODO: логировать/сохранять в БД
+	// TODO: сохранять в БД
 
 	return nil
 
