@@ -65,9 +65,6 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 		return nil
 	}
 
-	// Удаляем фотографию
-	_ = ph.Bot.Delete(c.Message())
-
 	ph.GameManager.TakePhoto(chat.ID, user, fileID)
 
 	return c.Send(fmt.Sprintf("%s, %s", session.GetUserName(user.ID), messages.PhotoReceived))

@@ -48,7 +48,7 @@ func (fh *FeedbackHandlers) HandleStartFeedback(c telebot.Context) error {
 	inline := &telebot.ReplyMarkup{}
 	inline.InlineKeyboard = [][]telebot.InlineButton{{btn}}
 
-	return c.Send("Спасибо! Вы можете оставить отзыв, перейдя в личные сообщения.", inline)
+	return c.Send(messages.StartFeedbackMessage, inline)
 }
 
 func (fh *FeedbackHandlers) SendFeedbackInstructions(c telebot.Context) error {
@@ -72,7 +72,7 @@ func (fh *FeedbackHandlers) HandelCancelFeedback(c telebot.Context) error {
 	if err := c.Respond(&telebot.CallbackResponse{
 		Text: "Отзыв отменён.",
 	}); err != nil {
-		log.Println("Не удалось отправить callback response:", err)
+		log.Println("[ERROR] Не удалось отправить callback response:", err)
 	}
 
 	return c.Edit("Отправка отзыва отменена.")
@@ -103,5 +103,4 @@ func (fh *FeedbackHandlers) HandelFeedbackText(c telebot.Context) error {
 	// TODO: сохранять в БД
 
 	return nil
-
 }

@@ -71,6 +71,12 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser)
 	}
 
+	if err := c.Send(messages.VotingStartedMessage); err != nil {
+		log.Printf("[ERROR] Не удалось отправить VotingStartedMessage: %v", err)
+	}
+
+	time.Sleep(2 * time.Second)
+
 	// вспомогательная структура для вытаскивания фото
 	type photoWithInd struct {
 		UserID  int64
@@ -105,7 +111,7 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 
 	go vh.voteTimeout(chat.ID, session)
 
-	return c.Send(messages.VotingStartedMessage)
+	return nil
 }
 
 func (vh *VoteHandlers) makeVoteHandler(chatID int64, photoNum int) func(telebot.Context) error {
