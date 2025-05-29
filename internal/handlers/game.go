@@ -14,8 +14,9 @@ type GameHandlers struct {
 	GameManager *game.GameManager
 
 	FeedbackHandlers *FeedbackHandlers
+	RoundHandlers    *RoundHandlers
 
-	startRoundBtn telebot.InlineButton
+	StartGameBtn telebot.InlineButton
 }
 
 func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager) *GameHandlers {
@@ -24,18 +25,20 @@ func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager) *GameH
 		Bot:         bot,
 		GameManager: gm,
 	}
-	h.startRoundBtn = telebot.InlineButton{
-		Unique: "start_round",
-		Text:   "Начать раунд",
+	h.StartGameBtn = telebot.InlineButton{
+		Unique: "start_game",
+		Text:   "Новая игра",
 	}
 	return h
 }
 
-func (h *GameHandlers) Register() {
+func (gh *GameHandlers) Register() {
 
-	h.Bot.Handle("/start", h.Start)
-	h.Bot.Handle("/startgame", h.StartGame)
-	h.Bot.Handle("/endgame", h.HandleEndGame)
+	gh.Bot.Handle("/start", gh.Start)
+	gh.Bot.Handle("/startgame", gh.StartGame)
+	gh.Bot.Handle("/endgame", gh.HandleEndGame)
+
+	gh.Bot.Handle(&gh.StartGameBtn, gh.StartGame)
 
 	// Для прод версии
 	// h.Bot.Handle("/startgame", GroupOnly(h.StartGame))
@@ -58,7 +61,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	chatID := c.Chat().ID
 
 	markup := &telebot.ReplyMarkup{}
-	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.startRoundBtn}}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.RoundHandlers.StartRoundBtn}}
 
 	gh.GameManager.StartNewGameSession(chatID)
 
@@ -70,17 +73,22 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 }
 
 // HandleEndGame - завершение игры, подсчет результатов сесссии
-func (h *GameHandlers) HandleEndGame(c telebot.Context) error {
+func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 	chatID := c.Chat().ID
 
-	session, exist := h.GameManager.GetSession(chatID)
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.StartGameBtn}}
+
+	session, exist := gh.GameManager.GetSession(chatID)
 	if !exist {
-		return c.Send(messages.GameNotStarted)
+		return c.Send(messages.GameNotStarted, markup)
 	}
+
+	markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{gh.FeedbackHandlers.FeedbackBtn})
 
 	result := bot.RenderScore(bot.FinalScore, session.TotalScore())
 
-	h.GameManager.EndGame(chatID)
+	gh.GameManager.EndGame(chatID)
 
-	return c.Send(result + "\n\n" + messages.FinishGameMassage)
+	return c.Send(result+"\n"+messages.FinishGameMassage, markup)
 }

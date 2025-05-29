@@ -17,7 +17,7 @@ type RoundHandlers struct {
 
 	GameHandlers *GameHandlers
 
-	startRoundBtn telebot.InlineButton
+	StartRoundBtn telebot.InlineButton
 }
 
 func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *tasks.TasksList) *RoundHandlers {
@@ -27,7 +27,7 @@ func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *t
 		GameManager: gm,
 		TasksList:   tl,
 	}
-	h.startRoundBtn = telebot.InlineButton{
+	h.StartRoundBtn = telebot.InlineButton{
 		Unique: "start_round",
 		Text:   "Начать раунд",
 	}
@@ -36,7 +36,7 @@ func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *t
 
 func (rh *RoundHandlers) Register() {
 
-	rh.Bot.Handle(&rh.startRoundBtn, rh.HandleStartRound)
+	rh.Bot.Handle(&rh.StartRoundBtn, rh.HandleStartRound)
 	rh.Bot.Handle("/newround", rh.HandleStartRound)
 
 	// Для прод версии
@@ -50,12 +50,15 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 		_ = c.Respond(&telebot.CallbackResponse{})
 	}
 
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{rh.GameHandlers.StartGameBtn}}
+
 	chatID := c.Chat().ID
 
 	session, exist := rh.GameManager.GetSession(chatID)
 	if !exist {
 		log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chatID)
-		return c.Send(messages.GameNotStarted)
+		return c.Send(messages.GameNotStarted, markup)
 	}
 
 	task, err := rh.TasksList.GetRandomTask(session.UsedTasks)
@@ -73,10 +76,9 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 
 	text := messages.RoundStartedMessage + "\n" + "***" + task + "***"
 
-	btn := rh.startRoundBtn
+	btn := rh.StartRoundBtn
 	btn.Text = "🔁 Поменять задание"
 
-	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{btn}}
 
 	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)

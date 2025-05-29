@@ -36,6 +36,11 @@ func NewHandlers(
 
 	h.Round.GameHandlers = h.Game
 	h.Game.FeedbackHandlers = h.Feedback
+	h.Game.RoundHandlers = h.Round
+	h.Photo.VoteHandlers = h.Vote
+	h.Score.RoundHandlers = h.Round
+	h.Score.GameHandlers = h.Game
+	h.Vote.RoundHandlers = h.Round
 
 	return h
 }

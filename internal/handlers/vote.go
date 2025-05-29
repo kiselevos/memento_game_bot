@@ -16,7 +16,10 @@ type VoteHandlers struct {
 	Bot         botinterface.BotInterface
 	GameManager *game.GameManager
 
-	startRoundBtn telebot.InlineButton
+	RoundHandlers *RoundHandlers
+
+	StartVoteBtn  telebot.InlineButton
+	FinishVoteBtn telebot.InlineButton
 }
 
 func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager) *VoteHandlers {
@@ -25,9 +28,14 @@ func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager) *VoteH
 		Bot:         bot,
 		GameManager: gm,
 	}
-	h.startRoundBtn = telebot.InlineButton{
-		Unique: "start_round",
-		Text:   "Начать раунд",
+
+	h.StartVoteBtn = telebot.InlineButton{
+		Unique: "start_vote",
+		Text:   "Начать голосование",
+	}
+	h.FinishVoteBtn = telebot.InlineButton{
+		Unique: "finish_vote",
+		Text:   "Завершить голосование",
 	}
 	return h
 }
@@ -36,6 +44,9 @@ func (vh *VoteHandlers) Register() {
 
 	vh.Bot.Handle("/vote", vh.StartVote)
 	vh.Bot.Handle("/finishvote", vh.HandleFinishVote)
+
+	vh.Bot.Handle(&vh.StartVoteBtn, vh.StartVote)
+	vh.Bot.Handle(&vh.FinishVoteBtn, vh.HandleFinishVote)
 
 	// для прода
 	// h.Bot.Handle("/vote", GroupOnly(h.StartVote))
@@ -68,11 +79,14 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser)
 	}
 
-	if err := c.Send(messages.VotingStartedMessage); err != nil {
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.FinishVoteBtn}}
+
+	if err := c.Send(messages.VotingStartedMessage, markup); err != nil {
 		log.Printf("[ERROR] Не удалось отправить VotingStartedMessage: %v", err)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// вспомогательная структура для вытаскивания фото
 	type photoWithInd struct {
@@ -106,7 +120,7 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		}
 	}
 
-	go vh.voteTimeout(chat.ID, session)
+	// go vh.voteTimeout(chat.ID, session)
 
 	return nil
 }
@@ -136,20 +150,21 @@ func (vh *VoteHandlers) HandleVote(c telebot.Context, chatID int64, photoNum int
 	return c.Send(result.Message)
 }
 
-func (h *VoteHandlers) FinishVoting(chatID int64, session *game.GameSession) {
+func (vh *VoteHandlers) FinishVoting(chatID int64, session *game.GameSession) {
 
 	if session.FSM.Current() != game.VoteState {
 		log.Printf("[WARN] Попытка повторного завершения голосования в чате %d", chatID)
 		return
 	}
 
-	h.GameManager.FinishVoting(session)
+	vh.GameManager.FinishVoting(session)
 	result := bot.RenderScore(bot.RoundScore, session.RoundScore())
 
 	markup := &telebot.ReplyMarkup{}
-	markup.InlineKeyboard = [][]telebot.InlineButton{{h.startRoundBtn}}
-	if h.Bot != nil {
-		h.Bot.Send(&telebot.Chat{ID: chatID}, result, markup)
+	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.RoundHandlers.StartRoundBtn}}
+
+	if vh.Bot != nil {
+		vh.Bot.Send(&telebot.Chat{ID: chatID}, result, markup)
 	}
 }
 
@@ -166,6 +181,7 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 	return nil
 }
 
+// Таймер на голосование (отключен)
 func (vh *VoteHandlers) voteTimeout(chatID int64, session *game.GameSession) {
 	const voteDuration = 33 * time.Second
 

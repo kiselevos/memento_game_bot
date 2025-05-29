@@ -15,15 +15,24 @@ type FeedbackHandlers struct {
 	FeedbackManager *feedback.FeedbackManager
 	AdminsID        []int64
 	BotUsername     string
+
+	FeedbackBtn telebot.InlineButton
 }
 
 func NewFeedbackHandler(bot botinterface.BotInterface, fm *feedback.FeedbackManager, adminsID []int64, botName string) *FeedbackHandlers {
-	return &FeedbackHandlers{
+	h := &FeedbackHandlers{
 		Bot:             bot,
 		FeedbackManager: fm,
 		AdminsID:        adminsID,
 		BotUsername:     botName,
 	}
+
+	h.FeedbackBtn = telebot.InlineButton{
+		Text: "Оставить отзыв",
+		URL:  fmt.Sprintf("https://t.me/%s?start=feedback", h.BotUsername),
+	}
+
+	return h
 }
 
 func (fh *FeedbackHandlers) Register() {
@@ -41,12 +50,8 @@ func (fh *FeedbackHandlers) HandleStartFeedback(c telebot.Context) error {
 		return fh.SendFeedbackInstructions(c)
 	}
 
-	btn := telebot.InlineButton{
-		Text: "Оставить отзыв",
-		URL:  fmt.Sprintf("https://t.me/%s?start=feedback", fh.BotUsername),
-	}
 	inline := &telebot.ReplyMarkup{}
-	inline.InlineKeyboard = [][]telebot.InlineButton{{btn}}
+	inline.InlineKeyboard = [][]telebot.InlineButton{{fh.FeedbackBtn}}
 
 	return c.Send(messages.StartFeedbackMessage, inline)
 }
