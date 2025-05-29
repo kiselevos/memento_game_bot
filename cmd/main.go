@@ -43,7 +43,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	botUsername := b.Me.Username
+	botInfo := b.Me
 
 	// Инициализация GameManager
 	tl, err := tasks.NewTasksList("assets/tasks.json")
@@ -53,7 +53,7 @@ func main() {
 	gm := game.NewGameManager(userRepo, sessionRepo, taskRepo)
 	fm := feedback.NewFeedbackManager(10 * time.Minute)
 
-	h := handlers.NewHandlers(b, fm, conf.Admin.AdminsID, botUsername, gm, tl)
+	h := handlers.NewHandlers(b, fm, conf.Admin.AdminsID, botInfo, gm, tl)
 	h.RegisterAll()
 
 	log.Println("Bot starts...")

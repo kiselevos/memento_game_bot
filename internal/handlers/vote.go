@@ -37,6 +37,7 @@ func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager) *VoteH
 		Unique: "finish_vote",
 		Text:   "Завершить голосование",
 	}
+
 	return h
 }
 
@@ -79,10 +80,7 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser)
 	}
 
-	markup := &telebot.ReplyMarkup{}
-	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.FinishVoteBtn}}
-
-	if err := c.Send(messages.VotingStartedMessage, markup); err != nil {
+	if err := c.Send(messages.VotingStartedMessage); err != nil {
 		log.Printf("[ERROR] Не удалось отправить VotingStartedMessage: %v", err)
 	}
 
@@ -122,7 +120,10 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 
 	// go vh.voteTimeout(chat.ID, session)
 
-	return nil
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.FinishVoteBtn}}
+
+	return c.Send(messages.VoitingMessage, markup)
 }
 
 func (vh *VoteHandlers) makeVoteHandler(chatID int64, photoNum int) func(telebot.Context) error {

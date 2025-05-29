@@ -3,8 +3,10 @@ package handlers
 import (
 	messages "PhotoBattleBot/assets"
 	"PhotoBattleBot/internal/bot"
+	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
+	"log"
 
 	"gopkg.in/telebot.v3"
 )
@@ -12,6 +14,7 @@ import (
 type GameHandlers struct {
 	Bot         botinterface.BotInterface
 	GameManager *game.GameManager
+	BotInfo     *telebot.User
 
 	FeedbackHandlers *FeedbackHandlers
 	RoundHandlers    *RoundHandlers
@@ -19,11 +22,12 @@ type GameHandlers struct {
 	StartGameBtn telebot.InlineButton
 }
 
-func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager) *GameHandlers {
+func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager, botInfo *telebot.User) *GameHandlers {
 
 	h := &GameHandlers{
 		Bot:         bot,
 		GameManager: gm,
+		BotInfo:     botInfo,
 	}
 	h.StartGameBtn = telebot.InlineButton{
 		Unique: "start_game",
@@ -57,6 +61,11 @@ func (gh *GameHandlers) Start(c telebot.Context) error {
 
 // StartGame - работает из любого места, начинает новую сессию, заканчивая старую
 func (gh *GameHandlers) StartGame(c telebot.Context) error {
+
+	if err := middleware.CheckBotAdminRights(c, gh.BotInfo, gh.Bot); err != nil {
+		log.Println("[ERROR] Запуск игры без прав админа", err)
+		return err
+	}
 
 	chatID := c.Chat().ID
 

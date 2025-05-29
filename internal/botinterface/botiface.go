@@ -12,4 +12,5 @@ type BotInterface interface {
 	Delete(msg tb.Editable) error
 	Handle(endpoint interface{}, handler telebot.HandlerFunc, middlwear ...telebot.MiddlewareFunc)
 	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
+	ChatMemberOf(chat telebot.Recipient, bot telebot.Recipient) (*telebot.ChatMember, error)
 }

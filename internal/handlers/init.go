@@ -5,6 +5,8 @@ import (
 	"PhotoBattleBot/internal/feedback"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/tasks"
+
+	"gopkg.in/telebot.v3"
 )
 
 type Handlers struct {
@@ -20,17 +22,17 @@ func NewHandlers(
 	bot botinterface.BotInterface,
 	fm *feedback.FeedbackManager,
 	adminsID []int64,
-	botName string,
+	botInfo *telebot.User,
 	gm *game.GameManager,
 	tl *tasks.TasksList,
 ) *Handlers {
 
 	h := &Handlers{
-		Game:     NewGameHandlers(bot, gm),
+		Game:     NewGameHandlers(bot, gm, botInfo),
 		Round:    NewRoundHandlers(bot, gm, tl),
 		Vote:     NewVoteHandlers(bot, gm),
 		Score:    NewScoreHandlers(bot, gm),
-		Feedback: NewFeedbackHandler(bot, fm, adminsID, botName),
+		Feedback: NewFeedbackHandler(bot, fm, adminsID, botInfo.Username),
 		Photo:    NewPhotoHandlers(bot, gm),
 	}
 
