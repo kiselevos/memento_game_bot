@@ -69,14 +69,16 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 
+	if gh.GameManager.CheckFirstGame(chatID) {
+		if gh.Bot != nil {
+			gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage)
+		}
+	}
+
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.RoundHandlers.StartRoundBtn}}
 
 	gh.GameManager.StartNewGameSession(chatID)
-
-	if gh.Bot != nil {
-		gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage)
-	}
 
 	return c.Send(messages.GameRulesText, markup)
 }

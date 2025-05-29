@@ -75,6 +75,16 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	return session
 }
 
+// CheckFirstGame - Проверка на первую игру в группе.
+func (gm *GameManager) CheckFirstGame(chatID int64) bool {
+
+	_, err := gm.SessionRepo.GetSessionByID(chatID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true
+	}
+	return false
+}
+
 // Сбор статистики task
 func (gm *GameManager) saveTaskStats(session *GameSession) {
 	prevTask := session.CarrentTask
