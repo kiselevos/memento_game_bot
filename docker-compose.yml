@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - ./postgres-data:/data/postgres
+      - ./postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -31,3 +31,16 @@ services:
       postgres:
         condition: service_healthy
     restart: on-failure
+    volumes:
+      - ./logs:/app/logs
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["go", "run", "migrations/auto.go"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env

@@ -5,24 +5,25 @@ import (
 	"PhotoBattleBot/internal/models"
 	"log"
 
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func main() {
 
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("Error loading .env file", err)
-	}
-
 	dsn := config.GetDsn()
-	println("DSN used:", dsn) // Добавил вывод
+	log.Println("DSN used in Migrate:", dsn)
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("failed to connect to DB: %v", err)
+	}
+
+	err = db.AutoMigrate(&models.User{}, &models.Session{}, &models.Task{})
 
 	if err != nil {
-		panic(err)
+		log.Fatalf("migration failed: %v", err)
 	}
-	db.AutoMigrate(&models.User{}, &models.Session{}, &models.Task{})
+
+	log.Println("migrations applied successfully")
 }
