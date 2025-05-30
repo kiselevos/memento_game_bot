@@ -67,5 +67,6 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 
 	ph.GameManager.TakePhoto(chat.ID, user, fileID)
 
-	return c.Send(fmt.Sprintf("%s, %s", session.GetUserName(user.ID), messages.PhotoReceived), markup)
+	return c.Send(fmt.Sprintf("%s, %s", session.GetUserName(user.ID), messages.PhotoReceived),
+		&telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
 }

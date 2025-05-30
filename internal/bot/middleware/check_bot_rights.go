@@ -14,6 +14,10 @@ func CheckBotAdminRights(c telebot.Context, botUser *telebot.User, bot botinterf
 
 	chat := c.Chat()
 
+	if c.Chat().Type == telebot.ChatPrivate {
+		return nil
+	}
+
 	member, err := bot.ChatMemberOf(chat, botUser)
 	if err != nil {
 		log.Printf("[ERROR] Не удалось получить статус бота в чате: %v", err)

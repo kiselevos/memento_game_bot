@@ -1,9 +1,13 @@
 package bot
 
 import (
+	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
 	"fmt"
 	"strings"
+	"time"
+
+	"gopkg.in/telebot.v3"
 )
 
 const (
@@ -23,4 +27,23 @@ func RenderScore(title string, scores []game.PlayerScore) string {
 		}
 	}
 	return b.String()
+}
+
+// Анимация загрузки
+func WaitingAnimation(c telebot.Context, bot botinterface.BotInterface, t int) {
+
+	steps := []string{"⏳ Подготовка", " ⏳ Подготовка.", "  ⏳ Подготовка..", "  ⏳ Подготовка..."}
+
+	msg, err := bot.Send(&telebot.Chat{ID: c.Chat().ID}, steps[0])
+	if err != nil {
+		return
+	}
+
+	for i := 0; i < t; i++ {
+		time.Sleep(1 * time.Second)
+		step := steps[i%len(steps)]
+		bot.Edit(msg, step)
+	}
+
+	_ = bot.Delete(msg)
 }

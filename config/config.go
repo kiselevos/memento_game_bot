@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -29,28 +27,20 @@ type AdminsConfig struct {
 }
 
 func GetDsn() string {
-	err := godotenv.Load(".env")
-	if err != nil {
-		fmt.Println("Problem with load configs .env file. Using default config", err)
-	}
-
-	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
 		os.Getenv("POSTGRES_PASSWORD"),
 		os.Getenv("DB_NAME"),
 		os.Getenv("DB_PORT"),
 	)
+
+	fmt.Println("DSN used:", dsn)
+
+	return dsn
 }
 
-// LoadAminsID достаем IDшники админов из env
 func LoadAminsID() []int64 {
-
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("Problem with load configs .env file. Using default config", err)
-	}
-
 	raw := os.Getenv("ADMINS_ID")
 	if raw == "" {
 		log.Println("ADMINS_ID is not set")
@@ -65,27 +55,17 @@ func LoadAminsID() []int64 {
 		if strID == "" {
 			continue
 		}
-
-		id, err := strconv.Atoi(strID)
+		id, err := strconv.ParseInt(strID, 10, 64)
 		if err != nil {
 			log.Printf("invalid admin ID '%s': %v", strID, err)
 			continue
 		}
-
-		res = append(res, int64(id))
+		res = append(res, id)
 	}
-
 	return res
-
 }
 
 func LoadConfig() *Config {
-
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("Problem with load configs .env file. Using default config", err)
-	}
-
 	token := os.Getenv("TELEGRAM_TOKEN")
 	if token == "" {
 		log.Fatal("TELEGRAM_TOKEN not set")

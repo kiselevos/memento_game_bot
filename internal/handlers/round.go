@@ -58,7 +58,7 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 	session, exist := rh.GameManager.GetSession(chatID)
 	if !exist {
 		log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chatID)
-		return c.Send(messages.GameNotStarted, markup)
+		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
 	}
 
 	task, err := rh.TasksList.GetRandomTask(session.UsedTasks)
@@ -71,7 +71,7 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 	err = rh.GameManager.StartNewRound(session, task)
 	if err != nil {
 		log.Printf("[ERROR] Ошибка начала нового раунда %d, %v", chatID, err)
-		return c.Send(messages.ErrorMessagesForUser)
+		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown})
 	}
 
 	text := messages.RoundStartedMessage + "\n" + "***" + task + "***"
