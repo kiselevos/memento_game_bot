@@ -3,6 +3,7 @@ package handlers
 import (
 	messages "PhotoBattleBot/assets"
 	"PhotoBattleBot/internal/bot"
+	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
 	"fmt"
@@ -43,11 +44,11 @@ func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager) *VoteH
 
 func (vh *VoteHandlers) Register() {
 
-	vh.Bot.Handle("/vote", vh.StartVote)
-	vh.Bot.Handle("/finishvote", vh.HandleFinishVote)
+	vh.Bot.Handle("/vote", vh.StartVote, middleware.OnlyAdmins(vh.Bot))
+	vh.Bot.Handle("/finishvote", vh.HandleFinishVote, middleware.OnlyAdmins(vh.Bot))
 
-	vh.Bot.Handle(&vh.StartVoteBtn, vh.StartVote)
-	vh.Bot.Handle(&vh.FinishVoteBtn, vh.HandleFinishVote)
+	vh.Bot.Handle(&vh.StartVoteBtn, vh.StartVote, middleware.OnlyAdmins(vh.Bot))
+	vh.Bot.Handle(&vh.FinishVoteBtn, vh.HandleFinishVote, middleware.OnlyAdmins(vh.Bot))
 
 	// для прода
 	// h.Bot.Handle("/vote", GroupOnly(h.StartVote))

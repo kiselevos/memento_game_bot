@@ -39,10 +39,10 @@ func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager, botInf
 func (gh *GameHandlers) Register() {
 
 	gh.Bot.Handle("/start", gh.Start)
-	gh.Bot.Handle("/startgame", gh.StartGame)
-	gh.Bot.Handle("/endgame", gh.HandleEndGame)
+	gh.Bot.Handle("/startgame", gh.StartGame, middleware.OnlyAdmins(gh.Bot))
+	gh.Bot.Handle("/endgame", gh.HandleEndGame, middleware.OnlyAdmins(gh.Bot))
 
-	gh.Bot.Handle(&gh.StartGameBtn, gh.StartGame)
+	gh.Bot.Handle(&gh.StartGameBtn, gh.StartGame, middleware.OnlyAdmins(gh.Bot))
 
 	// Для прод версии
 	// h.Bot.Handle("/startgame", GroupOnly(h.StartGame))
@@ -61,6 +61,12 @@ func (gh *GameHandlers) Start(c telebot.Context) error {
 
 // StartGame - работает из любого места, начинает новую сессию, заканчивая старую
 func (gh *GameHandlers) StartGame(c telebot.Context) error {
+
+	log.Printf("Callback from: %s", c.Sender().Username)
+	err := c.Respond()
+	if err != nil {
+		log.Printf("Respond error: %v", err)
+	}
 
 	if err := middleware.CheckBotAdminRights(c, gh.BotInfo, gh.Bot); err != nil {
 		log.Println("[ERROR] Запуск игры без прав админа", err)

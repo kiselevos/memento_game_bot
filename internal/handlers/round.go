@@ -2,6 +2,7 @@ package handlers
 
 import (
 	messages "PhotoBattleBot/assets"
+	"PhotoBattleBot/internal/bot/middleware"
 	"PhotoBattleBot/internal/botinterface"
 	"PhotoBattleBot/internal/game"
 	"PhotoBattleBot/internal/tasks"
@@ -36,8 +37,8 @@ func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *t
 
 func (rh *RoundHandlers) Register() {
 
-	rh.Bot.Handle(&rh.StartRoundBtn, rh.HandleStartRound)
-	rh.Bot.Handle("/newround", rh.HandleStartRound)
+	rh.Bot.Handle(&rh.StartRoundBtn, rh.HandleStartRound, middleware.OnlyAdmins(rh.Bot))
+	rh.Bot.Handle("/newround", rh.HandleStartRound, middleware.OnlyAdmins(rh.Bot))
 
 	// Для прод версии
 	// h.Bot.Handle(&h.startRoundBtn, GroupOnly(h.HandleStartRound))
@@ -45,6 +46,12 @@ func (rh *RoundHandlers) Register() {
 }
 
 func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
+
+	log.Printf("Callback from: %s", c.Sender().Username)
+	err := c.Respond()
+	if err != nil {
+		log.Printf("Respond error: %v", err)
+	}
 	//Убираем анимацию мерцания кнопки
 	if c.Callback() != nil {
 		_ = c.Respond(&telebot.CallbackResponse{})

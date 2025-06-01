@@ -18,7 +18,7 @@ import (
 
 func main() {
 
-	logging.InitLogger("bot.log")
+	logging.InitLogger("logs/bot.log")
 
 	conf := config.LoadConfig()
 
