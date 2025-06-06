@@ -38,7 +38,7 @@ func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager, botInf
 
 func (gh *GameHandlers) Register() {
 
-	gh.Bot.Handle("/start", gh.Start)
+	gh.Bot.Handle("/start", gh.Start, middleware.PrivateOnly(gh.Bot))
 	gh.Bot.Handle("/startgame", gh.StartGame, middleware.OnlyAdmins(gh.Bot))
 	gh.Bot.Handle("/endgame", gh.HandleEndGame, middleware.OnlyAdmins(gh.Bot))
 
