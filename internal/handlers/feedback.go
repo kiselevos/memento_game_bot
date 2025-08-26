@@ -53,7 +53,7 @@ func (fh *FeedbackHandlers) HandleStartFeedback(c telebot.Context) error {
 	inline := &telebot.ReplyMarkup{}
 	inline.InlineKeyboard = [][]telebot.InlineButton{{fh.FeedbackBtn}}
 
-	return c.Send(messages.StartFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, inline)
+	return c.Send(messages.StartFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, inline)
 }
 
 func (fh *FeedbackHandlers) SendFeedbackInstructions(c telebot.Context) error {
@@ -66,7 +66,7 @@ func (fh *FeedbackHandlers) SendFeedbackInstructions(c telebot.Context) error {
 	inline := &telebot.ReplyMarkup{}
 	inline.InlineKeyboard = [][]telebot.InlineButton{{cancelBtn}}
 
-	return c.Send(messages.AboutFeedback, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, inline)
+	return c.Send(messages.AboutFeedback, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, inline)
 }
 
 func (fh *FeedbackHandlers) HandelCancelFeedback(c telebot.Context) error {
@@ -93,7 +93,7 @@ func (fh *FeedbackHandlers) HandelFeedbackText(c telebot.Context) error {
 
 	fh.FeedbackManager.CancelFeedback(userID)
 
-	if err := c.Send(messages.ThanksFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}); err != nil {
+	if err := c.Send(messages.ThanksFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}); err != nil {
 		log.Println("[ERROR] Проблема с отравкой ообщения после отзыва:", err)
 	}
 

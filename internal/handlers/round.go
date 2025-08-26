@@ -65,7 +65,7 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 	session, exist := rh.GameManager.GetSession(chatID)
 	if !exist {
 		log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chatID)
-		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 
 	task, err := rh.TasksList.GetRandomTask(session.UsedTasks)
@@ -78,15 +78,15 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 	err = rh.GameManager.StartNewRound(session, task)
 	if err != nil {
 		log.Printf("[ERROR] Ошибка начала нового раунда %d, %v", chatID, err)
-		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown})
+		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 	}
 
-	text := messages.RoundStartedMessage + "\n" + "***" + task + "***"
+	text := messages.RoundStartedMessage + "\n<b>" + task + "</b>"
 
 	btn := rh.StartRoundBtn
 	btn.Text = "🔁 Поменять задание"
 
 	markup.InlineKeyboard = [][]telebot.InlineButton{{btn}}
 
-	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }

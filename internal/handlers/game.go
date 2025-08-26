@@ -56,7 +56,7 @@ func (gh *GameHandlers) Start(c telebot.Context) error {
 	if len(args) > 0 && args[0] == "feedback" {
 		return gh.FeedbackHandlers.SendFeedbackInstructions(c)
 	}
-	return c.Send(messages.WelcomeSingleMessage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown})
+	return c.Send(messages.WelcomeSingleMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 }
 
 // StartGame - работает из любого места, начинает новую сессию, заканчивая старую
@@ -77,7 +77,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
 	if gh.GameManager.CheckFirstGame(chatID) {
 		if gh.Bot != nil {
-			gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown})
+			gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 			bot.WaitingAnimation(c, gh.Bot, 5)
 		}
 	}
@@ -87,7 +87,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
 	gh.GameManager.StartNewGameSession(chatID)
 
-	return c.Send(messages.GameRulesText, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+	return c.Send(messages.GameRulesText, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }
 
 // HandleEndGame - завершение игры, подсчет результатов сесссии
@@ -99,7 +99,7 @@ func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 
 	session, exist := gh.GameManager.GetSession(chatID)
 	if !exist {
-		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 
 	markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{gh.FeedbackHandlers.FeedbackBtn})
@@ -108,5 +108,5 @@ func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 
 	gh.GameManager.EndGame(chatID)
 
-	return c.Send(result+"\n"+messages.FinishGameMassage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+	return c.Send(result+"\n"+messages.FinishGameMassage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }

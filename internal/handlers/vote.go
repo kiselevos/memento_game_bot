@@ -67,7 +67,7 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 
 	// Зашита от нулевого голосования когда никто не скинул фото)
 	if len(session.UsersPhoto) == 0 {
-		return c.Send(messages.NotEnoughPhoto, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown})
+		return c.Send(messages.NotEnoughPhoto, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 	}
 
 	// // Для честного голосования?
@@ -81,7 +81,7 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser)
 	}
 
-	if err := c.Send(messages.VotingStartedMessage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}); err != nil {
+	if err := c.Send(messages.VotingStartedMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}); err != nil {
 		log.Printf("[ERROR] Не удалось отправить VotingStartedMessage: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.FinishVoteBtn}}
 
-	return c.Send(messages.VoitingMessage, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+	return c.Send(messages.VoitingMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }
 
 func (vh *VoteHandlers) makeVoteHandler(chatID int64, photoNum int) func(telebot.Context) error {
@@ -149,7 +149,7 @@ func (vh *VoteHandlers) HandleVote(c telebot.Context, chatID int64, photoNum int
 
 	_ = c.Respond(&telebot.CallbackResponse{Text: messages.VotedReceived})
 
-	return c.Send(result.Message, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown})
+	return c.Send(result.Message, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 }
 
 func (vh *VoteHandlers) FinishVoting(chatID int64, session *game.GameSession) {
@@ -166,7 +166,7 @@ func (vh *VoteHandlers) FinishVoting(chatID int64, session *game.GameSession) {
 	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.RoundHandlers.StartRoundBtn}}
 
 	if vh.Bot != nil {
-		vh.Bot.Send(&telebot.Chat{ID: chatID}, result, &telebot.SendOptions{ParseMode: telebot.ModeMarkdown}, markup)
+		vh.Bot.Send(&telebot.Chat{ID: chatID}, result, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 }
 
