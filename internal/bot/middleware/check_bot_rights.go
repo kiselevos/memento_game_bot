@@ -1,10 +1,11 @@
 package middleware
 
 import (
-	messages "PhotoBattleBot/assets"
-	"PhotoBattleBot/internal/botinterface"
 	"errors"
 	"log"
+
+	messages "github.com/kiselevos/photo_battle_bot/assets"
+	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
 
 	"gopkg.in/telebot.v3"
 )

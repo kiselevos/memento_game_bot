@@ -1,11 +1,12 @@
 package bot
 
 import (
-	"PhotoBattleBot/internal/botinterface"
-	"PhotoBattleBot/internal/game"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
+	"github.com/kiselevos/photo_battle_bot/internal/game"
 
 	"gopkg.in/telebot.v3"
 )

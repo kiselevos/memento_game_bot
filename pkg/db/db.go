@@ -1,8 +1,9 @@
 package db
 
 import (
-	"PhotoBattleBot/config"
 	"log"
+
+	"github.com/kiselevos/photo_battle_bot/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

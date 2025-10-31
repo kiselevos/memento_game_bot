@@ -1,4 +1,4 @@
-module PhotoBattleBot
+module github.com/kiselevos/photo_battle_bot
 
 go 1.23.2
 

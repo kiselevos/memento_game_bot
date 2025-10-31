@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"PhotoBattleBot/internal/models"
-	"PhotoBattleBot/pkg/db"
+	"github.com/kiselevos/photo_battle_bot/internal/models"
+	"github.com/kiselevos/photo_battle_bot/pkg/db"
 )
 
 const (

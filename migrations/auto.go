@@ -1,9 +1,10 @@
 package main
 
 import (
-	"PhotoBattleBot/config"
-	"PhotoBattleBot/internal/models"
 	"log"
+
+	"github.com/kiselevos/photo_battle_bot/config"
+	"github.com/kiselevos/photo_battle_bot/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

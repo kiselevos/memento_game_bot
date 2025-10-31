@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	messages "PhotoBattleBot/assets"
-	"PhotoBattleBot/internal/botinterface"
-	"PhotoBattleBot/internal/feedback"
 	"fmt"
 	"log"
+
+	messages "github.com/kiselevos/photo_battle_bot/assets"
+	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
+	"github.com/kiselevos/photo_battle_bot/internal/feedback"
 
 	"gopkg.in/telebot.v3"
 )

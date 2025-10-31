@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"PhotoBattleBot/internal/botinterface"
 	"log"
+
+	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
 
 	"gopkg.in/telebot.v3"
 )

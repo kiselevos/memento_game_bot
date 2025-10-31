@@ -1,17 +1,18 @@
 package main
 
 import (
-	"PhotoBattleBot/config"
-	"PhotoBattleBot/internal/bot/middleware"
-	"PhotoBattleBot/internal/feedback"
-	"PhotoBattleBot/internal/game"
-	"PhotoBattleBot/internal/handlers"
-	"PhotoBattleBot/internal/logging"
-	"PhotoBattleBot/internal/repositories"
-	"PhotoBattleBot/internal/tasks"
-	"PhotoBattleBot/pkg/db"
 	"log"
 	"time"
+
+	"github.com/kiselevos/photo_battle_bot/config"
+	"github.com/kiselevos/photo_battle_bot/internal/bot/middleware"
+	"github.com/kiselevos/photo_battle_bot/internal/feedback"
+	"github.com/kiselevos/photo_battle_bot/internal/game"
+	"github.com/kiselevos/photo_battle_bot/internal/handlers"
+	"github.com/kiselevos/photo_battle_bot/internal/logging"
+	"github.com/kiselevos/photo_battle_bot/internal/repositories"
+	"github.com/kiselevos/photo_battle_bot/internal/tasks"
+	"github.com/kiselevos/photo_battle_bot/pkg/db"
 
 	tb "gopkg.in/telebot.v3"
 )

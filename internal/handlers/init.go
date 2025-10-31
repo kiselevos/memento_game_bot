@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"PhotoBattleBot/internal/botinterface"
-	"PhotoBattleBot/internal/feedback"
-	"PhotoBattleBot/internal/game"
-	"PhotoBattleBot/internal/tasks"
+	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
+	"github.com/kiselevos/photo_battle_bot/internal/feedback"
+	"github.com/kiselevos/photo_battle_bot/internal/game"
+	"github.com/kiselevos/photo_battle_bot/internal/tasks"
 
 	"gopkg.in/telebot.v3"
 )

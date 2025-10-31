@@ -1,13 +1,14 @@
 package game
 
 import (
-	messages "PhotoBattleBot/assets"
-	"PhotoBattleBot/internal/models"
-	"PhotoBattleBot/internal/repositories"
 	"errors"
 	"fmt"
 	"log"
 	"sync"
+
+	messages "github.com/kiselevos/photo_battle_bot/assets"
+	"github.com/kiselevos/photo_battle_bot/internal/models"
+	"github.com/kiselevos/photo_battle_bot/internal/repositories"
 
 	"gopkg.in/telebot.v3"
 	"gorm.io/gorm"
