@@ -22,6 +22,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    environment:
+      APP_ENV: docker
     command: ["go", "run", "migrations/auto.go"]
     depends_on:
       postgres:
