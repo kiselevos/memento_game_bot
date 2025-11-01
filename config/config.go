@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -73,6 +75,13 @@ func LoadAminsID() []int64 {
 }
 
 func LoadConfig() *Config {
+
+	if os.Getenv("APP_ENV") != "docker" {
+		if err := godotenv.Load(); err != nil {
+			log.Println("⚠️  .env file not found, using system environment variables")
+		}
+	}
+
 	token := os.Getenv("TELEGRAM_TOKEN")
 	if token == "" {
 		log.Fatal("TELEGRAM_TOKEN not set")
