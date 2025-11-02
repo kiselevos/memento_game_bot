@@ -3,7 +3,7 @@ package db
 import (
 	"log"
 
-	"github.com/kiselevos/photo_battle_bot/config"
+	"github.com/kiselevos/memento_game_bot/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

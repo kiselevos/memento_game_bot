@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	messages "github.com/kiselevos/photo_battle_bot/assets"
-	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
-	"github.com/kiselevos/photo_battle_bot/internal/feedback"
+	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/botinterface"
+	"github.com/kiselevos/memento_game_bot/internal/feedback"
 
 	"gopkg.in/telebot.v3"
 )

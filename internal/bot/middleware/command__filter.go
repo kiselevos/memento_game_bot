@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
+	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 
 	"gopkg.in/telebot.v3"
 )

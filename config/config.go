@@ -31,9 +31,12 @@ type AdminsConfig struct {
 func GetDsn() string {
 	env := os.Getenv("APP_ENV")
 
-	host := "localhost"
-	if env == "docker" {
-		host = "postgres"
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+		if env == "docker" {
+			host = "postgres"
+		}
 	}
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&TimeZone=UTC",

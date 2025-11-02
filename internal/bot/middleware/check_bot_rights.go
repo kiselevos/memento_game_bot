@@ -4,8 +4,8 @@ import (
 	"errors"
 	"log"
 
-	messages "github.com/kiselevos/photo_battle_bot/assets"
-	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
+	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 
 	"gopkg.in/telebot.v3"
 )

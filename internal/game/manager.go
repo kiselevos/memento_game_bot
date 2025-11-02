@@ -6,9 +6,9 @@ import (
 	"log"
 	"sync"
 
-	messages "github.com/kiselevos/photo_battle_bot/assets"
-	"github.com/kiselevos/photo_battle_bot/internal/models"
-	"github.com/kiselevos/photo_battle_bot/internal/repositories"
+	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/models"
+	"github.com/kiselevos/memento_game_bot/internal/repositories"
 
 	"gopkg.in/telebot.v3"
 	"gorm.io/gorm"

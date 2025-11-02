@@ -28,10 +28,15 @@ db-up: ## Запуск PostgreSQL контейнера
 	@docker compose -f docker-compose.db.yml up -d postgres
 	@echo "✅ PostgreSQL created & run"
 
+.PHONY: db-stop
+db-stop: ## Остановка PostgreSQL контейнера без удаления данных
+	@docker compose -f docker-compose.db.yml stop postgres
+	@echo "⏸ PostgreSQL stopped"
+
 .PHONY: db-down
-db-down: ## Остановка и удаление PostgreSQL контейнера
+db-down: ## Остановка и удаление PostgreSQL контейнера и данных
 	@docker compose -f docker-compose.db.yml down -v
-	@echo "✅ PostgreSQL stoped & remove"
+	@echo "🧹 PostgreSQL stopped & removed"
 
 .PHONY: migrate
 migrate: ## Запуск миграций в Docker

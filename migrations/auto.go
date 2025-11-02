@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/kiselevos/photo_battle_bot/config"
-	"github.com/kiselevos/photo_battle_bot/internal/models"
+	"github.com/kiselevos/memento_game_bot/config"
+	"github.com/kiselevos/memento_game_bot/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

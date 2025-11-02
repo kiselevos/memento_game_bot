@@ -3,11 +3,11 @@ package handlers
 import (
 	"log"
 
-	messages "github.com/kiselevos/photo_battle_bot/assets"
-	"github.com/kiselevos/photo_battle_bot/internal/bot"
-	"github.com/kiselevos/photo_battle_bot/internal/bot/middleware"
-	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
-	"github.com/kiselevos/photo_battle_bot/internal/game"
+	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/bot"
+	"github.com/kiselevos/memento_game_bot/internal/bot/middleware"
+	"github.com/kiselevos/memento_game_bot/internal/botinterface"
+	"github.com/kiselevos/memento_game_bot/internal/game"
 
 	"gopkg.in/telebot.v3"
 )

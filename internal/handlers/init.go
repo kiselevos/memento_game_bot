@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"github.com/kiselevos/photo_battle_bot/internal/botinterface"
-	"github.com/kiselevos/photo_battle_bot/internal/feedback"
-	"github.com/kiselevos/photo_battle_bot/internal/game"
-	"github.com/kiselevos/photo_battle_bot/internal/tasks"
+	"github.com/kiselevos/memento_game_bot/internal/botinterface"
+	"github.com/kiselevos/memento_game_bot/internal/feedback"
+	"github.com/kiselevos/memento_game_bot/internal/game"
+	"github.com/kiselevos/memento_game_bot/internal/tasks"
 
 	"gopkg.in/telebot.v3"
 )

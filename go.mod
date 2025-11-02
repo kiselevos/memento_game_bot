@@ -1,4 +1,4 @@
-module github.com/kiselevos/photo_battle_bot
+module github.com/kiselevos/memento_game_bot
 
 go 1.23.2
 
