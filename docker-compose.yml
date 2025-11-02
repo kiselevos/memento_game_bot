@@ -6,20 +6,17 @@ services:
     container_name: pbb_bot
     env_file:
       - .env
+    restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
-    restart: on-failure
+      - bot-prepare
     volumes:
       - ./logs:/app/logs
 
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["go", "run", "migrations/auto.go"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env
+  # фиктивный сервис, для docker-compose при первом старте
+  bot-prepare:
+    image: busybox
+    command: /bin/true
+
+networks:
+  default:
+    name: pbb_network

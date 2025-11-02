@@ -22,10 +22,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: pbb_migrate
+    command: ["go", "run", "migrations/auto.go"]
+    env_file:
+      - .env
     environment:
       APP_ENV: docker
-    command: ["go", "run", "migrations/auto.go"]
     depends_on:
       postgres:
         condition: service_healthy
-    env_file: .env
+
+networks:
+  default:
+    name: pbb_network
