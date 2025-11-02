@@ -9,14 +9,57 @@ help: ## Display this help screen
 	awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 # ============================================================
-# ⚙️ Setup Tools
+# ⚙️ Development Commands
 # ============================================================
+
+.PHONY: tidy
+tidy: ## Обновление зависимостей проекта
+	@echo "🔍 Installing app packages..."
+	@go mod tidy
+	@go mod download
+	@echo "✅ Packages installed"
+
 .PHONY: run
-run: 
+run: ## Запуск бота локально (Подключение к DB в docker)
 	@go run ./cmd/main.go
 
+.PHONY: db-up
+db-up: ## Запуск PostgreSQL контейнера
+	@docker compose -f docker-compose.db.yml up -d postgres
+	@echo "✅ PostgreSQL created & run"
 
-.PHONY: db-run
-db-run: 
-	@docker compose -f docker-compose.db.yml up -d
+.PHONY: db-down
+db-down: ## Остановка и удаление PostgreSQL контейнера
+	@docker compose -f docker-compose.db.yml down -v
+	@echo "✅ PostgreSQL stoped & remove"
 
+.PHONY: migrate
+migrate: ## Запуск миграций в Docker
+	@docker compose -f docker-compose.db.yml run --rm migrate
+	@echo "✅ Migrate success"
+
+.PHONY: rebuild
+rebuild: ## Персборка образа для миграций
+	@docker compose -f docker-compose.db.yml build migrate
+
+.PHONY: logs-db
+logs-db: ## Логи PostgreSQL контейнера
+	@docker logs -f pbb_postgres
+
+.PHONY: clean
+clean: ## Остановка и удаление всех Postgres контенеров, данных DB 
+	@docker compose -f docker-compose.db.yml down -v --remove-orphans
+
+.PHONY: ps
+ps: ## Показать запушенные контенеры Docker
+	@docker ps --filter "name=pbb_postgres"
+
+# ============================================================
+# 🧩 Combined Shortcuts
+# ============================================================
+
+.PHONY: setup
+setup: db-up migrate ## Поднятие базы и установка миграций
+
+.PHONY: restart
+restart: db-down db-up migrate ## Перезапуск DB и миграций
