@@ -23,7 +23,10 @@ func main() {
 
 	conf := config.LoadConfig()
 
-	database := db.NewDB(conf)
+	database, err := db.NewDB(conf)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Repository
 	userRepo := repositories.NewUserRepository(database)
