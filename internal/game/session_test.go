@@ -100,7 +100,7 @@ func TestTakePhoto(t *testing.T) {
 
 	t.Run("Username saved", func(t *testing.T) {
 		got := s.UserNames[user.ID]
-		if got != "@"+userName_1 {
+		if got != userName_1 {
 			t.Errorf("Expected %s, got %s", userName_1, got)
 		}
 	})
