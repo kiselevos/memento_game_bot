@@ -20,7 +20,7 @@ type GameManager struct {
 	mu       sync.Mutex
 
 	UserRepo    *repositories.UserRepository
-	SessionRepo *repositories.SessionRepository
+	SessionRepo repositories.SessionRepositoryInterface
 	TaskRepo    *repositories.TaskRepository
 }
 

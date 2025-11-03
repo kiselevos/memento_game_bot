@@ -5,6 +5,14 @@ import (
 	"github.com/kiselevos/memento_game_bot/pkg/db"
 )
 
+type SessionRepositoryInterface interface {
+	Create(session *models.Session) (*models.Session, error)
+	GetSessionByID(chatID int64) (*models.Session, error)
+	ChangeIsActive(chatID int64) error
+	AddUserToSession(session *models.Session, user *models.User) error
+	AddPhotosCount(chatID int64) error
+}
+
 type SessionRepository struct {
 	DataBase *db.Db
 }
