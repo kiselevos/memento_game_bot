@@ -43,8 +43,8 @@ migrate: ## Запуск миграций в Docker
 	@docker compose -f docker-compose.db.yml run --rm migrate
 	@echo "✅ Migrate success"
 
-.PHONY: rebuild
-rebuild: ## Персборка образа для миграций
+.PHONY: rebuild-migrate
+rebuild-migrate: ## Персборка образа для миграций
 	@docker compose -f docker-compose.db.yml build migrate
 
 .PHONY: logs-db
@@ -68,3 +68,18 @@ setup: db-up migrate ## Поднятие базы и установка мигр
 
 .PHONY: restart
 restart: db-down db-up migrate ## Перезапуск DB и миграций
+
+# ============================================================
+# 🧪 Tests & Checks
+# ============================================================
+.PHONY: test-all
+test-all: ## Run all tests include postgres-data
+	@go test ./... -v
+	@echo "✅ Tests finished"
+
+
+PHONY: lint
+lint: ## Run fmt & vet
+	@go fmt ./...
+	@go vet ./...
+	@echo "✅ Go vet & fmt success complete"

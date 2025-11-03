@@ -17,4 +17,4 @@
 /logs
 
 # postgres
-/postgres-data
+postgres-data/

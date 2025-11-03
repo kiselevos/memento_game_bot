@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data
+      - pbb_pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -35,3 +35,7 @@ services:
 networks:
   default:
     name: pbb_network
+
+# Избавляемя от локальных volume
+volumes:
+  pbb_pgdata:

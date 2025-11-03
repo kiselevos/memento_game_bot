@@ -1,0 +1,77 @@
+name: CI
+on:
+  pull_request:
+    branches: [ develop, main ]
+  push:
+    branches: [ develop, main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16.4
+        env:
+          POSTGRES_USER: photo_user
+          POSTGRES_PASSWORD: photo_password
+          POSTGRES_DB: photo_battle_bot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U photo_user"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # Установка зависимостей
+      - name: Download dependencies
+        run: make tidy
+
+      - name: Go vet & fmt
+        run: make lint 
+
+      # Запуск миграций
+      - name: Run DB migrations
+        env:
+          DB_USER: photo_user
+          DB_PASSWORD: photo_password
+          DB_NAME: photo_battle_bot
+          DB_PORT: 5432
+          DB_HOST: localhost
+          APP_ENV: local
+        run: go run ./migrations/auto.go
+
+      # Сборка Docker-образов
+      - name: Build Docker images
+        run: |
+          make rebuild-migrate
+          docker compose build
+
+      # Проверка, что Docker-образы собираются корректно
+      - name: Verify images
+        run: docker images | grep photo_battle_bot
+
+      - name: Run backend tests
+        run: make test-all
