@@ -238,12 +238,13 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *telebot.User, photoNum 
 		}, fmt.Errorf("unknown photo")
 	}
 
-	// if targetUserID == voter.ID {
-	// return &VoteResult{
-	// 		Message:    messages.VotedForSelf,
-	// 		IsCallback: true,
-	// 	}, nil
-	// }
+	// Голосование за себя
+	if targetUserID == voter.ID {
+		return &VoteResult{
+			Message:    messages.VotedForSelf,
+			IsCallback: true,
+		}, nil
+	}
 
 	session.Votes[voter.ID] = targetUserID
 	session.Score[targetUserID]++
