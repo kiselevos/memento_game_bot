@@ -78,12 +78,8 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 
 // CheckFirstGame - Проверка на первую игру в группе.
 func (gm *GameManager) CheckFirstGame(chatID int64) bool {
-
 	_, err := gm.SessionRepo.GetSessionByID(chatID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return true
-	}
-	return false
+	return errors.Is(err, gorm.ErrRecordNotFound)
 }
 
 // Сбор статистики task
@@ -115,12 +111,12 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	log.Printf("[GAME] Новый раунд запущен в чате %d", session.ChatID)
 
 	if !SafeTrigger(session.FSM, EventStartRound, "StartNewRound") {
-		return fmt.Errorf("Ошибка перехода FSM")
+		return fmt.Errorf("oшибка перехода FSM")
 	}
 
-	t, err := gm.TaskRepo.GetTaskByText(task)
+	_, err := gm.TaskRepo.GetTaskByText(task)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		t = models.NewTask(task)
+		t := models.NewTask(task)
 		_, err = gm.TaskRepo.Create(t)
 		if err != nil {
 			log.Printf("[DB ERROR] Не удалось добавить task %s: %v", task, err)
@@ -174,7 +170,7 @@ func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID strin
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
-	session, _ := gm.sessions[chatID]
+	session := gm.sessions[chatID]
 
 	gm.addSessionUserIfNotExist(session, user)
 
@@ -198,7 +194,7 @@ func (gm *GameManager) StartVoting(session *GameSession) error {
 	log.Printf("[GAME] Голосование запущено в чате %d", session.ChatID)
 
 	if !SafeTrigger(session.FSM, EventStartVote, "StartVoting") {
-		return fmt.Errorf("Ошибка перехода FSM")
+		return fmt.Errorf("oшибка перехода FSM")
 	}
 
 	session.Votes = make(map[int64]int64)
