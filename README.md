@@ -34,9 +34,9 @@ make tidy
 # Пример .env
 APP_ENV=local
 
-DB_USER=photo_user
-DB_PASSWORD=photo_password
-DB_NAME=photo_battle_bot
+DB_USER=memento_user
+DB_PASSWORD=memento_password
+DB_NAME=memento_battle_bot
 DB_PORT=5432
 
 ADMINS_ID=your_tg_id
@@ -75,7 +75,7 @@ make run
 
 ### Проектная структура
 ```bash
-photo_battle_bot/
+memento_game_bot/
 │
 ├── Dockerfile
 ├── Makefile
