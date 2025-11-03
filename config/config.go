@@ -47,8 +47,6 @@ func GetDsn() string {
 		os.Getenv("DB_NAME"),
 	)
 
-	fmt.Println("DSN used:", dsn)
-
 	return dsn
 }
 

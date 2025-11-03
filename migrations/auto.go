@@ -13,7 +13,6 @@ import (
 func main() {
 
 	dsn := config.GetDsn()
-	log.Println("DSN used in Migrate:", dsn)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
