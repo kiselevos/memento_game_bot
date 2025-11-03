@@ -49,7 +49,7 @@ rebuild-migrate: ## Персборка образа для миграций
 
 .PHONY: logs-db
 logs-db: ## Логи PostgreSQL контейнера
-	@docker logs -f pbb_postgres
+	@docker logs -f memento_postgres
 
 .PHONY: clean
 clean: ## Остановка и удаление всех Postgres контенеров, данных DB 
@@ -57,7 +57,7 @@ clean: ## Остановка и удаление всех Postgres контен�
 
 .PHONY: ps
 ps: ## Показать запушенные контенеры Docker
-	@docker ps --filter "name=pbb_postgres"
+	@docker ps --filter "name=memento_postgres"
 
 # ============================================================
 # 🧩 Combined Shortcuts

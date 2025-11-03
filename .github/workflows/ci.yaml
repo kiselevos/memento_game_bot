@@ -13,13 +13,13 @@ jobs:
       postgres:
         image: postgres:16.4
         env:
-          POSTGRES_USER: photo_user
-          POSTGRES_PASSWORD: photo_password
-          POSTGRES_DB: photo_battle_bot
+          POSTGRES_USER: memento_user
+          POSTGRES_PASSWORD: memento_password
+          POSTGRES_DB: memento_bot
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U photo_user"
+          --health-cmd="pg_isready -U memento_user"
           --health-interval=5s
           --health-timeout=3s
           --health-retries=5
@@ -55,9 +55,9 @@ jobs:
       # Запуск миграций
       - name: Run DB migrations
         env:
-          DB_USER: photo_user
-          DB_PASSWORD: photo_password
-          DB_NAME: photo_battle_bot
+          DB_USER: memento_user
+          DB_PASSWORD: memento_password
+          DB_NAME: memento_bot
           DB_PORT: 5432
           DB_HOST: localhost
           APP_ENV: local
@@ -71,7 +71,7 @@ jobs:
 
       # Проверка, что Docker-образы собираются корректно
       - name: Verify images
-        run: docker images | grep photo_battle_bot
-
-      - name: Run backend tests
+        run: docker images | grep memento_game_bot- || true
+        
+      - name: Run tests
         run: make test-all

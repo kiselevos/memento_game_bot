@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16.4
-    container_name: pbb_postgres
+    container_name: memento_postgres
     env_file:
       - .env
     environment:
@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - pbb_pgdata:/var/lib/postgresql/data
+      - memento_pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: pbb_migrate
+    container_name: memento_migrate
     command: ["go", "run", "migrations/auto.go"]
     env_file:
       - .env
@@ -34,8 +34,8 @@ services:
 
 networks:
   default:
-    name: pbb_network
+    name: memento_network
 
 # Избавляемя от локальных volume
 volumes:
-  pbb_pgdata:
+  memento_pgdata:

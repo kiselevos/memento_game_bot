@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: pbb_bot
+    container_name: memento_bot
     env_file:
       - .env
     restart: unless-stopped
@@ -19,4 +19,4 @@ services:
 
 networks:
   default:
-    name: pbb_network
+    name: memento_network
