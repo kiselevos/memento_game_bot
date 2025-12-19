@@ -166,7 +166,7 @@ memento_game_bot/
 make tidy    # Установка зависимостей Go
 make setup   # Поднять PostgreSQL и применить миграции
 make run     # Запустить бота локально
-make restart    # Перезапустит базу данных и миграции
+make restart # Перезапустит базу данных и миграции
 make db-stop # Остановка контейнеров
 ```
 
