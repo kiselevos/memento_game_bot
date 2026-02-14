@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -14,10 +15,15 @@ type Config struct {
 	Db    DbConfig
 	TG    TgConfig
 	Admin AdminsConfig
+	Bot   BotConfig
 }
 
 type DbConfig struct {
-	Dsn string
+	Dsn         string
+	MaxAttempts int
+	Delay       time.Duration
+	MaxDelay    time.Duration
+	PingTimeout time.Duration
 }
 
 type TgConfig struct {
@@ -26,6 +32,26 @@ type TgConfig struct {
 
 type AdminsConfig struct {
 	AdminsID []int64
+}
+
+type BotConfig struct {
+	DropOldMessagesAfter time.Duration
+	FeedbackTTL          time.Duration
+}
+
+func GetBotConfig() BotConfig {
+	return BotConfig{
+		DropOldMessagesAfter: envDuration("BOT_DROP_OLD_TIMEOUT", 10*time.Second),
+		FeedbackTTL:          envDuration("BOT_FEEDBACK_TTL", 10*time.Minute),
+	}
+}
+
+func GetDbConfig() DbConfig {
+	return DbConfig{
+		Dsn:         GetDsn(),
+		Delay:       envDuration("DB_DELAY_CONNECTION", 2*time.Second),
+		MaxAttempts: envInt("DB_MAX_ATTEMPTS", 5),
+	}
 }
 
 func GetDsn() string {
@@ -39,26 +65,34 @@ func GetDsn() string {
 		}
 	}
 
+	user := os.Getenv("DB_USER")
+	pass := os.Getenv("DB_PASSWORD")
+	port := os.Getenv("DB_PORT")
+	name := os.Getenv("DB_NAME")
+
+	if user == "" || pass == "" || port == "" || name == "" {
+		log.Fatal("DB env is not set полностью: DB_USER, DB_PASSWORD, DB_PORT, DB_NAME are required")
+	}
+
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&TimeZone=UTC",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		host,
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
+		user, pass, host, port, name,
 	)
 
 	return dsn
 }
 
-func LoadAminsID() []int64 {
+func GetAdminConfig() AdminsConfig {
+
 	raw := os.Getenv("ADMINS_ID")
 	if raw == "" {
 		log.Println("ADMINS_ID is not set")
-		return nil
+		return AdminsConfig{
+			AdminsID: nil,
+		}
 	}
 
 	admins := strings.Split(raw, ",")
-	var res []int64
+	var adminsID []int64
 
 	for _, strID := range admins {
 		strID = strings.TrimSpace(strID)
@@ -70,33 +104,69 @@ func LoadAminsID() []int64 {
 			log.Printf("invalid admin ID '%s': %v", strID, err)
 			continue
 		}
-		res = append(res, id)
+		adminsID = append(adminsID, id)
 	}
-	return res
+
+	return AdminsConfig{
+		AdminsID: adminsID,
+	}
 }
 
-func LoadConfig() *Config {
+func LoadConfig() (*Config, error) {
 
 	if os.Getenv("APP_ENV") != "docker" {
 		if err := godotenv.Load(); err != nil {
-			log.Println("⚠️  .env file not found, using system environment variables")
+			log.Println(".env file not found, using system environment variables")
 		}
 	}
 
 	token := os.Getenv("TELEGRAM_TOKEN")
 	if token == "" {
-		log.Fatal("TELEGRAM_TOKEN not set")
+		return nil, fmt.Errorf("TELEGRAM_TOKEN not set")
 	}
 
 	return &Config{
 		TG: TgConfig{
 			Token: token,
 		},
-		Db: DbConfig{
-			Dsn: GetDsn(),
-		},
-		Admin: AdminsConfig{
-			AdminsID: LoadAminsID(),
-		},
+		Db:    GetDbConfig(),
+		Admin: GetAdminConfig(),
+		Bot:   GetBotConfig(),
+	}, nil
+}
+
+// helper for duration
+func envDuration(key string, def time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return def
 	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("invalid %s=%q: %v (using default %s)", key, raw, err, def)
+		return def
+	}
+	if d <= 0 {
+		log.Printf("invalid %s=%q: must be > 0 (using default %s)", key, raw, def)
+		return def
+	}
+	return d
+}
+
+// helper for int
+func envInt(key string, def int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		log.Printf("invalid %s=%q: %v (using default %d)", key, raw, err, def)
+		return def
+	}
+	if n <= 0 {
+		log.Printf("invalid %s=%q: must be > 0 (using default %d)", key, raw, def)
+		return def
+	}
+	return n
 }

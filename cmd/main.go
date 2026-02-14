@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"time"
 
 	"github.com/kiselevos/memento_game_bot/config"
 	"github.com/kiselevos/memento_game_bot/internal/bot/middleware"
@@ -21,9 +20,12 @@ func main() {
 
 	logging.InitLogger("logs/bot.log")
 
-	conf := config.LoadConfig()
+	conf, err := config.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	database, err := db.NewDB(conf)
+	database, err := db.NewDB(&conf.Db)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,7 +38,7 @@ func main() {
 	// Tg settings
 	pref := tb.Settings{
 		Token:  conf.TG.Token,
-		Poller: middleware.DropOldMessages(10 * time.Second),
+		Poller: middleware.DropOldMessages(conf.Bot.DropOldMessagesAfter),
 		OnError: func(err error, c tb.Context) {
 			log.Printf("Error: %v\n", err)
 		},
@@ -55,7 +57,7 @@ func main() {
 		log.Fatal(err)
 	}
 	gm := game.NewGameManager(userRepo, sessionRepo, taskRepo)
-	fm := feedback.NewFeedbackManager(10 * time.Minute)
+	fm := feedback.NewFeedbackManager(conf.Bot.FeedbackTTL)
 
 	h := handlers.NewHandlers(b, fm, conf.Admin.AdminsID, botInfo, gm, tl)
 	h.RegisterAll()

@@ -18,16 +18,11 @@ type Db struct {
 }
 
 // NewDB - создание нового подключения к DB
-func NewDB(conf *config.Config) (*Db, error) {
-	var db *gorm.DB
+func NewDB(conf *config.DbConfig) (*Db, error) {
 	var err error
 
-	dsn := conf.Db.Dsn
-	maxAttempts := 5
-	delay := 2 * time.Second
-
-	for i := 1; i <= maxAttempts; i++ {
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+	for i := 1; i <= conf.MaxAttempts; i++ {
+		db, err := gorm.Open(postgres.Open(conf.Dsn), &gorm.Config{
 			PrepareStmt:            true,
 			SkipDefaultTransaction: true,
 			Logger:                 logger.Default.LogMode(logger.Warn),
@@ -44,10 +39,9 @@ func NewDB(conf *config.Config) (*Db, error) {
 
 			log.Println("Database connection failed, retrying...",
 				"attempt", i, "error", err)
-			time.Sleep(delay)
-
+			time.Sleep(conf.Delay)
 		}
 	}
 
-	return nil, fmt.Errorf("could not connect to database after %d attempts: %w", maxAttempts, err)
+	return nil, fmt.Errorf("could not connect to database after %d attempts: %w", conf.MaxAttempts, err)
 }
