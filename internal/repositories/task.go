@@ -3,8 +3,8 @@ package repositories
 import (
 	"fmt"
 
+	"github.com/kiselevos/memento_game_bot/internal/db"
 	"github.com/kiselevos/memento_game_bot/internal/models"
-	"github.com/kiselevos/memento_game_bot/pkg/db"
 
 	"gorm.io/gorm"
 )

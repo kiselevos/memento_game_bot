@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/kiselevos/memento_game_bot/config"
+	"github.com/kiselevos/memento_game_bot/internal/config"
 	"github.com/kiselevos/memento_game_bot/internal/models"
 
 	"gorm.io/driver/postgres"

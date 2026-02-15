@@ -3,15 +3,15 @@ package main
 import (
 	"log"
 
-	"github.com/kiselevos/memento_game_bot/config"
 	"github.com/kiselevos/memento_game_bot/internal/bot/middleware"
+	"github.com/kiselevos/memento_game_bot/internal/config"
+	"github.com/kiselevos/memento_game_bot/internal/db"
 	"github.com/kiselevos/memento_game_bot/internal/feedback"
 	"github.com/kiselevos/memento_game_bot/internal/game"
 	"github.com/kiselevos/memento_game_bot/internal/handlers"
 	"github.com/kiselevos/memento_game_bot/internal/logging"
 	"github.com/kiselevos/memento_game_bot/internal/repositories"
 	"github.com/kiselevos/memento_game_bot/internal/tasks"
-	"github.com/kiselevos/memento_game_bot/pkg/db"
 
 	tb "gopkg.in/telebot.v3"
 )

@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/kiselevos/memento_game_bot/config"
+	"github.com/kiselevos/memento_game_bot/internal/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
