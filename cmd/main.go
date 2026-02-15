@@ -11,6 +11,7 @@ import (
 	"github.com/kiselevos/memento_game_bot/internal/handlers"
 	"github.com/kiselevos/memento_game_bot/internal/logging"
 	"github.com/kiselevos/memento_game_bot/internal/repositories"
+	"github.com/kiselevos/memento_game_bot/internal/stats"
 	"github.com/kiselevos/memento_game_bot/internal/tasks"
 
 	tb "gopkg.in/telebot.v3"
@@ -35,6 +36,8 @@ func main() {
 	sessionRepo := repositories.NewSessionRepository(database)
 	taskRepo := repositories.NewTaskRepository(database)
 
+	rec := stats.NewPgRecorder(userRepo, sessionRepo, taskRepo)
+
 	// Tg settings
 	pref := tb.Settings{
 		Token:  conf.TG.Token,
@@ -56,7 +59,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	gm := game.NewGameManager(userRepo, sessionRepo, taskRepo)
+	gm := game.NewGameManager(rec)
 	fm := feedback.NewFeedbackManager(conf.Bot.FeedbackTTL)
 
 	h := handlers.NewHandlers(b, fm, conf.Admin.AdminsID, botInfo, gm, tl)

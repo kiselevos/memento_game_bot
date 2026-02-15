@@ -3,8 +3,6 @@ package game
 import (
 	"sync"
 	"testing"
-
-	"github.com/kiselevos/memento_game_bot/internal/repositories/mock"
 )
 
 const (
@@ -14,9 +12,8 @@ const (
 
 func newTestGameManager() *GameManager {
 	return &GameManager{
-		sessions:    map[int64]*GameSession{chatID: newTestGameSession()},
-		SessionRepo: &mock.FakeSessionRepo{},
-		mu:          sync.Mutex{},
+		sessions: map[int64]*GameSession{chatID: newTestGameSession()},
+		mu:       sync.Mutex{},
 	}
 }
 
