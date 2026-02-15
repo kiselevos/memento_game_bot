@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"sync"
 	"testing"
-
-	"gopkg.in/telebot.v3"
 )
 
 const (
@@ -82,7 +80,7 @@ func TestTakePhoto(t *testing.T) {
 
 	s := newTestGameSession()
 
-	user := &telebot.User{
+	user := &User{
 		ID:        userID_1,
 		Username:  userName_1,
 		FirstName: "Bob",
@@ -109,7 +107,7 @@ func TestTakePhoto(t *testing.T) {
 func TestTakePhotoWithoutUsername(t *testing.T) {
 	s := newTestGameSession()
 
-	user := &telebot.User{
+	user := &User{
 		ID:        userID_2,
 		Username:  "",
 		FirstName: userName_2,

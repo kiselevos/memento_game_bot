@@ -3,8 +3,6 @@ package game
 import (
 	"sort"
 	"sync"
-
-	"gopkg.in/telebot.v3"
 )
 
 // GameSession - Хранит данные о конкретной партии игры
@@ -71,7 +69,7 @@ func (s *GameSession) scoreFromMap(data map[int64]int) []PlayerScore {
 	return result
 }
 
-func (s *GameSession) TakePhoto(user *telebot.User, photoID string) {
+func (s *GameSession) TakePhoto(user *User, photoID string) {
 
 	s.UsersPhoto[user.ID] = photoID
 

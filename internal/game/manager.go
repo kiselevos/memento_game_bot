@@ -10,7 +10,6 @@ import (
 	"github.com/kiselevos/memento_game_bot/internal/models"
 	"github.com/kiselevos/memento_game_bot/internal/repositories"
 
-	"gopkg.in/telebot.v3"
 	"gorm.io/gorm"
 )
 
@@ -130,7 +129,7 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	return nil
 }
 
-func (gm *GameManager) addSessionUserIfNotExist(session *GameSession, user *telebot.User) {
+func (gm *GameManager) addSessionUserIfNotExist(session *GameSession, user *User) {
 	if _, exist := session.UserNames[user.ID]; exist {
 		return
 	}
@@ -165,7 +164,7 @@ func (gm *GameManager) addSessionUserIfNotExist(session *GameSession, user *tele
 
 }
 
-func (gm *GameManager) TakePhoto(chatID int64, user *telebot.User, photoID string) {
+func (gm *GameManager) TakePhoto(chatID int64, user *User, photoID string) {
 
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
@@ -208,7 +207,7 @@ type VoteResult struct {
 	IsError    bool
 }
 
-func (gm *GameManager) RegisterVote(chatID int64, voter *telebot.User, photoNum int) (*VoteResult, error) {
+func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*VoteResult, error) {
 
 	gm.mu.Lock()
 	defer gm.mu.Unlock()

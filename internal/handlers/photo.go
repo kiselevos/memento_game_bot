@@ -39,7 +39,11 @@ func (ph *PhotoHandlers) Register() {
 // TakeUserPhoto - обирает фото только в уловиях запущенного раунда.
 func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	chat := c.Chat()
-	user := c.Sender()
+	user := &game.User{
+		ID:        c.Sender().ID,
+		Username:  c.Sender().Username,
+		FirstName: c.Sender().FirstName,
+	}
 
 	session, exist := ph.GameManager.GetSession(chat.ID)
 	if !exist || session.FSM.Current() != game.RoundStartState {
