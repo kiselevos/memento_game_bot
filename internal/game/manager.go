@@ -41,7 +41,6 @@ func (gm *GameManager) GetSession(chatID int64) (*GameSession, bool) {
 // StartNewGameSession - запускает/перезапускает игру. Все очки стираются.
 func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	gm.mu.Lock()
-	defer gm.mu.Unlock()
 
 	log.Printf("[GAME] Игра запущена в чате %d", chatID)
 
@@ -52,11 +51,10 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 		Score:     make(map[int64]int),
 		UsedTasks: make(map[string]bool),
 		UserNames: make(map[int64]string),
-
-		mu: sync.Mutex{},
 	}
 
 	gm.sessions[chatID] = session
+	gm.mu.Unlock()
 
 	// Запись новой игровой сессии в БД
 	gm.stats.CreateSessionRecord(chatID)
@@ -73,61 +71,61 @@ func (gm *GameManager) CheckFirstGame(chatID int64) bool {
 	return first
 }
 
-// Сбор статистики task
-func (gm *GameManager) saveTaskStats(session *GameSession) {
-	prevTask := session.CarrentTask
-	if prevTask == "" {
-		return
-	}
-
-	gm.stats.IncrementTaskUsage(prevTask, len(session.UsersPhoto) > 0)
-}
-
 // StartNewRound - запускает новый раунд в текущей сессии
 func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	gm.mu.Lock()
-	defer gm.mu.Unlock()
 
-	gm.saveTaskStats(session)
+	chatID := session.ChatID
+	prevTask := session.CarrentTask
+	hadPhotos := len(session.UsersPhoto) > 0
 
-	log.Printf("[GAME] Новый раунд запущен в чате %d", session.ChatID)
+	log.Printf("[GAME] Новый раунд запущен в чате %d", chatID)
 
 	if !SafeTrigger(session.FSM, EventStartRound, "StartNewRound") {
+		gm.mu.Unlock()
 		return fmt.Errorf("oшибка перехода FSM")
 	}
-
-	// Запись таски в DB
-	gm.stats.RegisterRoundTask(session.ChatID, task)
 
 	session.CarrentTask = task
 	session.UsedTasks[task] = true
 	session.UsersPhoto = make(map[int64]string)
 
-	return nil
-}
+	gm.mu.Unlock()
 
-func (gm *GameManager) addSessionUserIfNotExist(session *GameSession, user *User) {
-
-	if _, exist := session.UserNames[user.ID]; exist {
-		return
+	// Запись таски в DB
+	if prevTask != "" {
+		gm.stats.IncrementTaskUsage(prevTask, hadPhotos)
 	}
+	gm.stats.RegisterRoundTask(chatID, task)
 
-	gm.stats.RegisterUserLinkedToSession(session.ChatID, *user)
+	return nil
 }
 
 func (gm *GameManager) TakePhoto(chatID int64, user *User, photoID string) {
 
 	gm.mu.Lock()
-	defer gm.mu.Unlock()
 
-	session := gm.sessions[chatID]
+	session, ok := gm.sessions[chatID]
+	if !ok || session == nil {
+		gm.mu.Unlock()
+		return
+	}
 
-	gm.addSessionUserIfNotExist(session, user)
-
-	// Запись статистики в DB
-	gm.stats.IncrementPhotoSubmission(chatID, user.ID)
+	isNewUser := false
+	if _, exist := session.UserNames[user.ID]; !exist {
+		session.UserNames[user.ID] = user.FirstName
+		isNewUser = true
+	}
 
 	session.TakePhoto(user, photoID)
+
+	gm.mu.Unlock()
+
+	// Запись статистики в DB
+	if isNewUser {
+		gm.stats.RegisterUserLinkedToSession(chatID, *user)
+	}
+	gm.stats.IncrementPhotoSubmission(chatID, user.ID)
 }
 
 func (gm *GameManager) StartVoting(session *GameSession) error {
@@ -154,10 +152,10 @@ type VoteResult struct {
 func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*VoteResult, error) {
 
 	gm.mu.Lock()
-	defer gm.mu.Unlock()
 
 	session, exist := gm.sessions[chatID]
 	if !exist || session.FSM.Current() != VoteState {
+		gm.mu.Unlock()
 		return &VoteResult{
 			Message:    messages.VotedEarler,
 			IsCallback: true,
@@ -165,6 +163,7 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 	}
 
 	if _, voted := session.Votes[voter.ID]; voted {
+		gm.mu.Unlock()
 		return &VoteResult{
 			Message:    messages.VotedAlready,
 			IsCallback: true,
@@ -174,6 +173,7 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 	targetUserID, ok := session.IndexPhotoToUser[photoNum]
 	if !ok {
 		log.Printf("[ERROR] Неизвестный номер фото %d в чате %d", photoNum, chatID)
+		gm.mu.Unlock()
 		return &VoteResult{
 			Message:    messages.ErrorMessagesForUser,
 			IsCallback: true,
@@ -183,6 +183,7 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 
 	// Голосование за себя
 	if targetUserID == voter.ID {
+		gm.mu.Unlock()
 		return &VoteResult{
 			Message:    messages.VotedForSelf,
 			IsCallback: true,
@@ -192,11 +193,15 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 	session.Votes[voter.ID] = targetUserID
 	session.Score[targetUserID]++
 
+	msg := fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID))
+
+	gm.mu.Unlock()
+
 	// Запись статистики голосования
 	gm.stats.RecordVote(voter.ID)
 
 	return &VoteResult{
-		Message:    fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID)),
+		Message:    msg,
 		IsCallback: false,
 	}, nil
 }
