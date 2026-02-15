@@ -55,6 +55,7 @@ func (gm *GameManager) StartNewGameSession(chatID int64, user User) *GameSession
 	}
 
 	gm.sessions[chatID] = session
+	session.UserNames[session.Host.ID] = DisplayNameHTML(&user)
 	gm.mu.Unlock()
 
 	// Запись новой игровой сессии в БД
@@ -112,11 +113,9 @@ func (gm *GameManager) TakePhoto(chatID int64, user *User, photoID string) {
 		return
 	}
 
-	isNewUser := false
-	if _, exist := session.UserNames[user.ID]; !exist {
-		session.UserNames[user.ID] = user.FirstName
-		isNewUser = true
-	}
+	// Проверяем на нового юзера
+	_, exist := session.UserNames[user.ID]
+	isNewUser := !exist
 
 	session.TakePhoto(user, photoID)
 

@@ -73,16 +73,9 @@ func (s *GameSession) scoreFromMap(data map[int64]int) []PlayerScore {
 }
 
 func (s *GameSession) TakePhoto(user *User, photoID string) {
-
 	s.UsersPhoto[user.ID] = photoID
 
-	// TODO: Собрать фидбэк по поводу имен. Как лучше?
-
 	if _, ok := s.UserNames[user.ID]; !ok {
-		if user.Username != "" {
-			s.UserNames[user.ID] = "@" + user.Username
-		} else {
-			s.UserNames[user.ID] = user.FirstName
-		}
+		s.UserNames[user.ID] = DisplayNameHTML(user)
 	}
 }

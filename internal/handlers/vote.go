@@ -136,7 +136,7 @@ func (vh *VoteHandlers) makeVoteHandler(chatID int64, photoNum int) func(telebot
 
 func (vh *VoteHandlers) HandleVote(c telebot.Context, chatID int64, photoNum int) error {
 
-	voter := bot.GetUserFromTelebot(c.Sender())
+	voter := game.GetUserFromTelebot(c.Sender())
 
 	result, err := vh.GameManager.RegisterVote(chatID, &voter, photoNum)
 	if err != nil && result.IsCallback {

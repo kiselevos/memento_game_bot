@@ -76,7 +76,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	}
 
 	chatID := c.Chat().ID
-	user := bot.GetUserFromTelebot(c.Sender())
+	user := game.GetUserFromTelebot(c.Sender())
 
 	if gh.GameManager.CheckFirstGame(chatID) {
 		if gh.Bot != nil {
@@ -88,7 +88,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.RoundHandlers.StartRoundBtn}}
 
-	text := fmt.Sprintf(messages.GameStartedWithHost, bot.DisplayNameHTML(&user))
+	text := fmt.Sprintf(messages.GameStartedWithHost, game.DisplayNameHTML(&user))
 
 	gh.GameManager.StartNewGameSession(chatID, user)
 
