@@ -113,5 +113,5 @@ func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 
 	gh.GameManager.EndGame(chatID)
 
-	return c.Send(result+"\n"+messages.FinishGameMassage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+	return c.Send(result+"\n"+messages.FinishGameMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }

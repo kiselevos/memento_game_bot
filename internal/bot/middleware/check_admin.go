@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"log"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
@@ -80,13 +81,16 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 				return next(c)
 			}
 
+			text := fmt.Sprintf(messages.OnlyHostRules, session.Host.FirstName)
+
 			if c.Callback() != nil {
 				return c.Respond(&telebot.CallbackResponse{
-					Text: messages.OnlyHostRules,
+					Text: text,
 				})
 			}
 
-			return c.Reply(messages.OnlyHostRules)
+			// На всякий случай, хотя в основном inline
+			return c.Reply(text)
 		}
 	}
 }

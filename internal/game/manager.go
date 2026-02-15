@@ -157,7 +157,7 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 	if !exist || session.FSM.Current() != VoteState {
 		gm.mu.Unlock()
 		return &VoteResult{
-			Message:    messages.VotedEarler,
+			Message:    messages.VotedEarlier,
 			IsCallback: true,
 		}, nil
 	}
