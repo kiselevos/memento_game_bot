@@ -45,11 +45,11 @@ func NewVoteHandlers(bot botinterface.BotInterface, gm *game.GameManager) *VoteH
 
 func (vh *VoteHandlers) Register() {
 
-	vh.Bot.Handle("/vote", vh.StartVote, middleware.OnlyAdmins(vh.Bot))
-	vh.Bot.Handle("/finishvote", vh.HandleFinishVote, middleware.OnlyAdmins(vh.Bot))
+	vh.Bot.Handle("/vote", vh.StartVote, middleware.OnlyHost(vh.GameManager))
+	vh.Bot.Handle("/finishvote", vh.HandleFinishVote, middleware.OnlyHost(vh.GameManager))
 
-	vh.Bot.Handle(&vh.StartVoteBtn, vh.StartVote, middleware.OnlyAdmins(vh.Bot))
-	vh.Bot.Handle(&vh.FinishVoteBtn, vh.HandleFinishVote, middleware.OnlyAdmins(vh.Bot))
+	vh.Bot.Handle(&vh.StartVoteBtn, vh.StartVote, middleware.OnlyHost(vh.GameManager))
+	vh.Bot.Handle(&vh.FinishVoteBtn, vh.HandleFinishVote, middleware.OnlyHost(vh.GameManager))
 
 	// для прода
 	// h.Bot.Handle("/vote", GroupOnly(h.StartVote))
@@ -136,13 +136,9 @@ func (vh *VoteHandlers) makeVoteHandler(chatID int64, photoNum int) func(telebot
 
 func (vh *VoteHandlers) HandleVote(c telebot.Context, chatID int64, photoNum int) error {
 
-	voter := &game.User{
-		ID:        c.Sender().ID,
-		Username:  c.Sender().Username,
-		FirstName: c.Sender().FirstName,
-	}
+	voter := bot.GetUserFromTelebot(c.Sender())
 
-	result, err := vh.GameManager.RegisterVote(chatID, voter, photoNum)
+	result, err := vh.GameManager.RegisterVote(chatID, &voter, photoNum)
 	if err != nil && result.IsCallback {
 		_ = c.Respond(&telebot.CallbackResponse{Text: result.Message})
 		return nil

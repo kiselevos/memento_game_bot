@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
@@ -47,4 +48,34 @@ func WaitingAnimation(c telebot.Context, bot botinterface.BotInterface, t int) {
 	}
 
 	_ = bot.Delete(msg)
+}
+
+// Достаем game.User из телеги
+func GetUserFromTelebot(u *telebot.User) game.User {
+	return game.User{
+		ID:        u.ID,
+		Username:  u.Username,
+		FirstName: u.FirstName,
+	}
+}
+
+// Как обращаться к участнику
+func DisplayNameHTML(u *game.User) string {
+	if u == nil {
+		return "Анонимный Осётр"
+	}
+
+	// FirstName приоритет
+	name := strings.TrimSpace(u.FirstName)
+	if name != "" {
+		return html.EscapeString(name)
+	}
+
+	// Если нет FirstName используем username
+	if u.Username != "" {
+		return "@" + html.EscapeString(u.Username)
+	}
+
+	// Фолбэк
+	return "Анонимный Осётр"
 }

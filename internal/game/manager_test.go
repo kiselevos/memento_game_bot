@@ -43,7 +43,7 @@ func TestStartNewSession(t *testing.T) {
 
 	gm := newTestGameManager()
 
-	s := gm.StartNewGameSession(NewGameID)
+	s := gm.StartNewGameSession(NewGameID, User{})
 
 	if s.ChatID != NewGameID {
 		t.Errorf("Expected %d, got %d", NewGameID, s.ChatID)
@@ -71,7 +71,7 @@ func TestConcurrentAccess(t *testing.T) {
 	for i := 0; i < N; i++ {
 		go func(id int64) {
 			defer wg.Done()
-			gm.StartNewGameSession(id)
+			gm.StartNewGameSession(id, User{})
 			s, exist := gm.GetSession(id)
 			if !exist || s.ChatID != id {
 				t.Errorf("Session mismatch or missing for id %d", id)

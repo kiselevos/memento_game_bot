@@ -39,7 +39,7 @@ func (gm *GameManager) GetSession(chatID int64) (*GameSession, bool) {
 }
 
 // StartNewGameSession - запускает/перезапускает игру. Все очки стираются.
-func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
+func (gm *GameManager) StartNewGameSession(chatID int64, user User) *GameSession {
 	gm.mu.Lock()
 
 	log.Printf("[GAME] Игра запущена в чате %d", chatID)
@@ -47,6 +47,7 @@ func (gm *GameManager) StartNewGameSession(chatID int64) *GameSession {
 	session := &GameSession{
 		ChatID: chatID,
 		FSM:    NewFSM(),
+		Host:   user,
 
 		Score:     make(map[int64]int),
 		UsedTasks: make(map[string]bool),

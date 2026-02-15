@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
@@ -40,10 +41,10 @@ func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager, botInf
 func (gh *GameHandlers) Register() {
 
 	gh.Bot.Handle("/start", gh.Start, middleware.PrivateOnly(gh.Bot))
-	gh.Bot.Handle("/startgame", gh.StartGame, middleware.OnlyAdmins(gh.Bot))
-	gh.Bot.Handle("/endgame", gh.HandleEndGame, middleware.OnlyAdmins(gh.Bot))
+	gh.Bot.Handle("/startgame", gh.StartGame)
+	gh.Bot.Handle("/endgame", gh.HandleEndGame, middleware.OnlyHost(gh.GameManager))
 
-	gh.Bot.Handle(&gh.StartGameBtn, gh.StartGame, middleware.OnlyAdmins(gh.Bot))
+	gh.Bot.Handle(&gh.StartGameBtn, gh.StartGame)
 
 	// Для прод версии
 	// h.Bot.Handle("/startgame", GroupOnly(h.StartGame))
@@ -75,6 +76,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	}
 
 	chatID := c.Chat().ID
+	user := bot.GetUserFromTelebot(c.Sender())
 
 	if gh.GameManager.CheckFirstGame(chatID) {
 		if gh.Bot != nil {
@@ -86,9 +88,11 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.RoundHandlers.StartRoundBtn}}
 
-	gh.GameManager.StartNewGameSession(chatID)
+	text := fmt.Sprintf(messages.GameStartedWithHost, bot.DisplayNameHTML(&user))
 
-	return c.Send(messages.GameRulesText, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+	gh.GameManager.StartNewGameSession(chatID, user)
+
+	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }
 
 // HandleEndGame - завершение игры, подсчет результатов сесссии

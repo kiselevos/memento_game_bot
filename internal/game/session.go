@@ -2,7 +2,6 @@ package game
 
 import (
 	"sort"
-	"sync"
 )
 
 // GameSession - Хранит данные о конкретной партии игры
@@ -10,6 +9,7 @@ type GameSession struct {
 
 	// Постоянные
 	ChatID    int64            // Номер чата, где идет игра
+	Host      User             // Ведущий игры для управления
 	Score     map[int64]int    // Мапа с очками юзеров
 	UsedTasks map[string]bool  // Для отслеживаания используемых вопросов
 	UserNames map[int64]string //Список участников раунда
@@ -21,14 +21,17 @@ type GameSession struct {
 	UsersPhoto       map[int64]string // Хранение фотографий, отпрвленных юзером
 	CarrentTask      string           // Текущее задание
 	IndexPhotoToUser map[int]int64    // Мапа для голосования(Индекс очердности фото к игроку)
-
-	mu sync.Mutex
 }
 
 type PlayerScore struct {
 	UserID   int64
 	UserName string
 	Value    int
+}
+
+// Проверка ведущего игры
+func (s *GameSession) IsHost(userID int64) bool {
+	return s.Host.ID == userID
 }
 
 // GetUserName - возвращает имя или ник пользователя

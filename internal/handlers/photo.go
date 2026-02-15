@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/bot"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 	"github.com/kiselevos/memento_game_bot/internal/game"
 
@@ -39,11 +40,7 @@ func (ph *PhotoHandlers) Register() {
 // TakeUserPhoto - обирает фото только в уловиях запущенного раунда.
 func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	chat := c.Chat()
-	user := &game.User{
-		ID:        c.Sender().ID,
-		Username:  c.Sender().Username,
-		FirstName: c.Sender().FirstName,
-	}
+	user := bot.GetUserFromTelebot(c.Sender())
 
 	session, exist := ph.GameManager.GetSession(chat.ID)
 	if !exist || session.FSM.Current() != game.RoundStartState {
@@ -70,7 +67,7 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	// Принимаем и удаялем фото
 	_ = ph.Bot.Delete(c.Message())
 
-	ph.GameManager.TakePhoto(chat.ID, user, fileID)
+	ph.GameManager.TakePhoto(chat.ID, &user, fileID)
 
 	return c.Send(
 		fmt.Sprintf("<b>%s</b>, %s", session.GetUserName(user.ID), messages.PhotoReceived),

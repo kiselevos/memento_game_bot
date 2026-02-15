@@ -2,7 +2,6 @@ package game
 
 import (
 	"reflect"
-	"sync"
 	"testing"
 )
 
@@ -26,7 +25,6 @@ func newTestGameSession() *GameSession {
 		UsersPhoto:       make(map[int64]string),
 		CarrentTask:      "Задание",
 		IndexPhotoToUser: make(map[int]int64),
-		mu:               sync.Mutex{},
 		FSM:              NewFSM(),
 	}
 }

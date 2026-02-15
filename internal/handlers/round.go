@@ -38,8 +38,8 @@ func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *t
 
 func (rh *RoundHandlers) Register() {
 
-	rh.Bot.Handle(&rh.StartRoundBtn, rh.HandleStartRound, middleware.OnlyAdmins(rh.Bot))
-	rh.Bot.Handle("/newround", rh.HandleStartRound, middleware.OnlyAdmins(rh.Bot))
+	rh.Bot.Handle(&rh.StartRoundBtn, rh.HandleStartRound, middleware.OnlyHost(rh.GameManager))
+	rh.Bot.Handle("/newround", rh.HandleStartRound, middleware.OnlyHost(rh.GameManager))
 
 	// Для прод версии
 	// h.Bot.Handle(&h.startRoundBtn, GroupOnly(h.HandleStartRound))

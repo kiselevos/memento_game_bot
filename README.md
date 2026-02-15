@@ -42,7 +42,7 @@ APP_ENV=local # local/docker
 
 DB_USER=memento_user
 DB_PASSWORD=memento_password
-DB_NAME=memento_battle_bot
+DB_NAME=memento_bot
 DB_PORT=5432
 
 ADMINS_ID=your_tg_id
