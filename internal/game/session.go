@@ -26,6 +26,7 @@ type GameSession struct {
 	CarrentTask      string           // Текущее задание
 	IndexPhotoToUser map[int]int64    // Мапа для голосования(Индекс очердности фото к игроку)
 	VotePhotoMsgIDs  map[int]int      // Мапа для хранения msgID для удаления кнопок
+	SystemMsgIDs     []int            // Слайс для хранения msgID для удаления системных сообщений
 }
 
 var (

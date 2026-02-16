@@ -45,10 +45,13 @@ func (rh *RoundHandlers) Register() {
 
 func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 
-	log.Printf("Callback from: %s", c.Sender().Username)
-
 	if c.Callback() != nil {
 		_ = c.Respond()
+
+		empty := &telebot.ReplyMarkup{}
+		if _, err := rh.Bot.EditReplyMarkup(c.Message(), empty); err != nil {
+			log.Printf("[WARN] cannot remove keyboard: %v", err)
+		}
 	}
 
 	markup := &telebot.ReplyMarkup{}

@@ -242,7 +242,7 @@ func (gm *GameManager) FinishVoting(chatID int64) error {
 	})
 }
 
-// Сохранеям в сессии фото_id для последующего удаления
+// Сохранеям в сессии фото msg_id для последующего удаления
 func (gm *GameManager) SaveVotePhotoMsgID(chatID int64, photoNum int, msgID int) error {
 	return gm.DoWithSession(chatID, func(s *GameSession) error {
 		s.VotePhotoMsgIDs[photoNum] = msgID
@@ -250,17 +250,43 @@ func (gm *GameManager) SaveVotePhotoMsgID(chatID int64, photoNum int, msgID int)
 	})
 }
 
-// Получаем photo_id для удаления
-func (gm *GameManager) PopVotePhotoMsgIDs(chatID int64) ([]int, error) {
-	var ids []int
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
-		for _, msgID := range s.VotePhotoMsgIDs {
-			ids = append(ids, msgID)
-		}
-		s.VotePhotoMsgIDs = nil
+// Сохранеям в сессии системные msg_id для последующего удаления
+func (gm *GameManager) SaveSystemMsgID(chatID int64, msgID int) error {
+	return gm.DoWithSession(chatID, func(s *GameSession) error {
+		log.Printf("[SaveSystemMsgID] BEFORE len=%d add=%d session_ptr=%p",
+			len(s.SystemMsgIDs), msgID, s,
+		)
+		s.SystemMsgIDs = append(s.SystemMsgIDs, msgID)
+		log.Printf("[SaveSystemMsgID] AFTER  len=%d session_ptr=%p",
+			len(s.SystemMsgIDs), s,
+		)
 		return nil
 	})
-	return ids, err
+}
+
+type CleanupIDs struct {
+	VotePhotoMsgIDs []int
+	SystemMsgIDs    []int
+}
+
+// Получаем photo_id для удаления
+func (gm *GameManager) PopMsgIDs(chatID int64) (CleanupIDs, error) {
+	var out CleanupIDs
+
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+
+		for _, msgID := range s.VotePhotoMsgIDs {
+			out.VotePhotoMsgIDs = append(out.VotePhotoMsgIDs, msgID)
+		}
+		s.VotePhotoMsgIDs = nil
+
+		for _, msgID := range s.SystemMsgIDs {
+			out.SystemMsgIDs = append(out.SystemMsgIDs, msgID)
+		}
+		s.SystemMsgIDs = nil
+		return nil
+	})
+	return out, err
 }
 
 // Получить очки раунда

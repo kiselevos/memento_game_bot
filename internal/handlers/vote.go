@@ -77,7 +77,18 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		}
 	}
 
-	_ = c.Send(messages.VotingStartedMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+	msg, err := vh.Bot.Send(
+		c.Chat(),
+		messages.VotingStartedMessage,
+		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
+	)
+	if err != nil {
+		log.Printf("[WARN] cannot send VotingStartedMessage: %v", err)
+	} else if msg != nil {
+		if e := vh.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
+			log.Printf("[WARN] cannot save system msg id: %v", e)
+		}
+	}
 
 	for _, p := range photos {
 		btn := telebot.InlineButton{
@@ -148,7 +159,27 @@ func (vh *VoteHandlers) HandleVoteCallback(c telebot.Context) error {
 	}
 
 	_ = c.Respond(&telebot.CallbackResponse{Text: messages.VotedReceived})
-	return c.Send(result.Message, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+
+	if vh.Bot == nil {
+		return nil
+	}
+
+	msg, err := vh.Bot.Send(
+		&telebot.Chat{ID: chatID},
+		result.Message,
+		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
+	)
+	if err != nil {
+		log.Printf("[WARN] cannot send vote public msg: %v", err)
+		return nil
+	}
+
+	if msg != nil {
+		if e := vh.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
+			log.Printf("[WARN] cannot save system msg id (vote msg): %v", e)
+		}
+	}
+	return nil
 }
 
 func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
@@ -171,6 +202,14 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 		}
 	}
 
+	// CleanUP systemd message
+	cleanID, err := vh.GameManager.PopMsgIDs(chatID)
+	if err == nil {
+		vh.cleanupRoundArtifacts(chatID, cleanID)
+	} else {
+		log.Printf("[CLEANUP][WARN] PopMsgIDs failed: chat=%d err=%v", chatID, err)
+	}
+
 	// 2) Забираем результаты раунда внутри actor
 	scores, err := vh.GameManager.GetRoundScore(chatID)
 	if err != nil {
@@ -186,21 +225,49 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 		vh.Bot.Send(&telebot.Chat{ID: chatID}, result, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 
-	msgIDs, err := vh.GameManager.PopVotePhotoMsgIDs(chatID)
-	if err == nil && vh.Bot != nil {
-		empty := &telebot.ReplyMarkup{} // пустая клавиатура
+	return nil
+}
 
-		for _, id := range msgIDs {
-			m := &telebot.Message{
-				ID:   id,
-				Chat: &telebot.Chat{ID: chatID},
-			}
-
-			if _, e := vh.Bot.EditReplyMarkup(m, empty); e != nil {
-				log.Printf("[WARN] cannot remove keyboard from msg %d: %v", id, e)
-			}
-		}
+func (vh *VoteHandlers) cleanupRoundArtifacts(chatID int64, cleanID game.CleanupIDs) {
+	if vh.Bot == nil {
+		log.Printf("[CLEANUP] bot is nil, skip")
+		return
 	}
 
-	return nil
+	empty := &telebot.ReplyMarkup{}
+
+	// 1) Убираем inline-кнопки с фото (EditReplyMarkup)
+	okEdits := 0
+	for _, id := range cleanID.VotePhotoMsgIDs {
+		m := &telebot.Message{
+			ID:   id,
+			Chat: &telebot.Chat{ID: chatID},
+		}
+
+		if _, err := vh.Bot.EditReplyMarkup(m, empty); err != nil {
+			log.Printf("[CLEANUP][WARN] EditReplyMarkup failed: chat=%d msg=%d err=%v", chatID, id, err)
+			continue
+		}
+		okEdits++
+	}
+
+	// 2) Удаляем системные сообщения (Delete)
+	okDeletes := 0
+	for _, id := range cleanID.SystemMsgIDs {
+		m := &telebot.Message{
+			ID:   id,
+			Chat: &telebot.Chat{ID: chatID},
+		}
+
+		if err := vh.Bot.Delete(m); err != nil {
+			log.Printf("[CLEANUP][WARN] Delete failed: chat=%d msg=%d err=%v", chatID, id, err)
+			continue
+		}
+		okDeletes++
+	}
+
+	log.Printf(
+		"[CLEANUP] chat=%d votePhotoIDs=%d edited=%d systemIDs=%d deleted=%d",
+		chatID, len(cleanID.VotePhotoMsgIDs), okEdits, len(cleanID.SystemMsgIDs), okDeletes,
+	)
 }

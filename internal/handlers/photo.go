@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
@@ -67,9 +68,21 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	// Принимаем и удаялем фото
 	_ = ph.Bot.Delete(c.Message())
 
-	return c.Send(
+	msg, err := ph.Bot.Send(
+		c.Chat(),
 		fmt.Sprintf("<b>%s</b>, %s", userName, messages.PhotoReceived),
 		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
 		markup,
 	)
+	log.Printf("[PHOTO] chatID var=%d c.Chat().ID=%d", chatID, c.Chat().ID)
+	if err == nil && msg != nil {
+		log.Printf("[PHOTO] chatID var=%d c.Chat().ID=%d", chatID, c.Chat().ID)
+		if e := ph.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
+			log.Printf("[PHOTO][ERROR] SaveSystemMsgID failed chat=%d msg=%d err=%v", chatID, msg.ID, e)
+		} else {
+			log.Printf("[PHOTO] saved system msg id chat=%d msg=%d", chatID, msg.ID)
+		}
+	}
+
+	return nil
 }
