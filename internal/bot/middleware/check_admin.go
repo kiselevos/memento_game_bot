@@ -78,10 +78,10 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 			if err != nil {
 				log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chat.ID)
 				if c.Callback() != nil {
-					_ = c.Respond()
-					return c.Respond(&telebot.CallbackResponse{
+					_ = c.Respond(&telebot.CallbackResponse{
 						Text: messages.GameNotStarted,
 					})
+					return nil
 				}
 				return c.Reply(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 			}
@@ -93,9 +93,10 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 			text := fmt.Sprintf(messages.OnlyHostRules, hostName)
 
 			if c.Callback() != nil {
-				return c.Respond(&telebot.CallbackResponse{
+				_ = c.Respond(&telebot.CallbackResponse{
 					Text: text,
 				})
+				return nil
 			}
 
 			// На всякий случай, хотя в основном inline
