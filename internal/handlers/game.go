@@ -21,7 +21,10 @@ type GameHandlers struct {
 	FeedbackHandlers *FeedbackHandlers
 	RoundHandlers    *RoundHandlers
 
-	StartGameBtn telebot.InlineButton
+	// inline buttons
+	StartGameBtn      telebot.InlineButton
+	ConfirmRestartBtn telebot.InlineButton
+	CancelRestartBtn  telebot.InlineButton
 }
 
 func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager, botInfo *telebot.User) *GameHandlers {
@@ -35,6 +38,14 @@ func NewGameHandlers(bot botinterface.BotInterface, gm *game.GameManager, botInf
 		Unique: "start_game",
 		Text:   "Новая игра",
 	}
+	h.ConfirmRestartBtn = telebot.InlineButton{
+		Unique: "confirm_new_game",
+		Text:   "🆕 Начать новую игру",
+	}
+	h.CancelRestartBtn = telebot.InlineButton{
+		Unique: "cancel_new_game",
+		Text:   "❌ Отмена",
+	}
 	return h
 }
 
@@ -45,10 +56,9 @@ func (gh *GameHandlers) Register() {
 	gh.Bot.Handle("/endgame", gh.HandleEndGame, middleware.OnlyHost(gh.GameManager))
 
 	gh.Bot.Handle(&gh.StartGameBtn, gh.StartGame)
+	gh.Bot.Handle(&gh.ConfirmRestartBtn, gh.ConfirmNewGame)
+	gh.Bot.Handle(&gh.CancelRestartBtn, gh.CancelRestart)
 
-	// Для прод версии
-	// h.Bot.Handle("/startgame", GroupOnly(h.StartGame))
-	// h.Bot.Handle("/endgame", GroupOnly(h.HandleEndGame))
 }
 
 // Start - приветствие, или приветствие для фидбэка если переход по кнопке.
@@ -64,10 +74,10 @@ func (gh *GameHandlers) Start(c telebot.Context) error {
 // StartGame - работает из любого места, начинает новую сессию, заканчивая старую
 func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
-	log.Printf("Callback from: %s", c.Sender().Username)
-	err := c.Respond()
-	if err != nil {
-		log.Printf("Respond error: %v", err)
+	if c.Callback() != nil {
+		if err := c.Respond(); err != nil {
+			log.Printf("[WARN] Respond error: %v", err)
+		}
 	}
 
 	if err := middleware.CheckBotAdminRights(c, gh.BotInfo, gh.Bot); err != nil {
@@ -78,21 +88,69 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	chatID := c.Chat().ID
 	user := game.GetUserFromTelebot(c.Sender())
 
-	if gh.GameManager.CheckFirstGame(chatID) {
-		if gh.Bot != nil {
-			gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
-			bot.WaitingAnimation(c, gh.Bot, 5)
+	var hostName string
+	err := gh.GameManager.DoWithSession(chatID, func(s *game.GameSession) error {
+		hostName = s.Host.FirstName
+		return nil
+	})
+
+	if err != nil {
+		if gh.GameManager.CheckFirstGame(chatID) {
+			if gh.Bot != nil {
+				gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+				bot.WaitingAnimation(c, gh.Bot, 5)
+			}
 		}
+
+		markup := &telebot.ReplyMarkup{}
+		markup.InlineKeyboard = [][]telebot.InlineButton{{gh.RoundHandlers.StartRoundBtn}}
+
+		text := fmt.Sprintf(messages.GameStartedWithHost, game.DisplayNameHTML(&user))
+
+		gh.GameManager.StartNewGameSession(chatID, user)
+
+		return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+	}
+
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{
+		{gh.ConfirmRestartBtn, gh.CancelRestartBtn},
+	}
+
+	text := fmt.Sprintf(messages.GameAlreadyExist, hostName)
+
+	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+}
+
+// Подтверждение при рестарте.
+func (gh *GameHandlers) ConfirmNewGame(c telebot.Context) error {
+	if c.Callback() != nil {
+		_ = c.Respond(&telebot.CallbackResponse{Text: messages.RestartGameMsg})
+	}
+
+	chatID := c.Chat().ID
+	user := game.GetUserFromTelebot(c.Sender())
+
+	if err := gh.GameManager.StartNewGameSession(chatID, user); err != nil {
+		log.Printf("[ERROR] StartNewGameSession: %v", err)
+		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 	}
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.RoundHandlers.StartRoundBtn}}
 
 	text := fmt.Sprintf(messages.GameStartedWithHost, game.DisplayNameHTML(&user))
+	return c.Edit(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+}
 
-	gh.GameManager.StartNewGameSession(chatID, user)
-
-	return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+// Отмена рестарта
+func (gh *GameHandlers) CancelRestart(c telebot.Context) error {
+	if c.Callback() != nil {
+		_ = c.Respond(&telebot.CallbackResponse{Text: messages.CancelRestartMsg})
+		_ = c.Edit(messages.ContinueGameMsg)
+		return nil
+	}
+	return nil
 }
 
 // HandleEndGame - завершение игры, подсчет результатов сесссии

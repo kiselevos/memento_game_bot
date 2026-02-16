@@ -41,10 +41,6 @@ func (rh *RoundHandlers) Register() {
 
 	rh.Bot.Handle(&rh.StartRoundBtn, rh.HandleStartRound, middleware.OnlyHost(rh.GameManager))
 	rh.Bot.Handle("/newround", rh.HandleStartRound, middleware.OnlyHost(rh.GameManager))
-
-	// Для прод версии
-	// h.Bot.Handle(&h.startRoundBtn, GroupOnly(h.HandleStartRound))
-	// h.Bot.Handle("/newround", GroupOnly(h.HandleStartRound))
 }
 
 func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
