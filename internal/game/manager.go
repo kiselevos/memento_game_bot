@@ -242,6 +242,27 @@ func (gm *GameManager) FinishVoting(chatID int64) error {
 	})
 }
 
+// Сохранеям в сессии фото_id для последующего удаления
+func (gm *GameManager) SaveVotePhotoMsgID(chatID int64, photoNum int, msgID int) error {
+	return gm.DoWithSession(chatID, func(s *GameSession) error {
+		s.VotePhotoMsgIDs[photoNum] = msgID
+		return nil
+	})
+}
+
+// Получаем photo_id для удаления
+func (gm *GameManager) PopVotePhotoMsgIDs(chatID int64) ([]int, error) {
+	var ids []int
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+		for _, msgID := range s.VotePhotoMsgIDs {
+			ids = append(ids, msgID)
+		}
+		s.VotePhotoMsgIDs = nil
+		return nil
+	})
+	return ids, err
+}
+
 // Получить очки раунда
 func (gm *GameManager) GetRoundScore(chatID int64) ([]PlayerScore, error) {
 	var scores []PlayerScore

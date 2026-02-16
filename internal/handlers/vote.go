@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
@@ -90,11 +91,20 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		}
 
 		if vh.Bot != nil {
-			_, _ = vh.Bot.Send(
+			msg, err := vh.Bot.Send(
 				&telebot.Chat{ID: chatID},
 				&telebot.Photo{File: telebot.File{FileID: p.PhotoID}},
 				&telebot.SendOptions{ReplyMarkup: markup},
 			)
+
+			if err != nil {
+				log.Printf("[WARN] cannot send vote photo: %v", err)
+				continue
+			}
+			if msg != nil {
+				// сохраняем msg.ID в session
+				_ = vh.GameManager.SaveVotePhotoMsgID(chatID, p.Num, msg.ID)
+			}
 		}
 	}
 
@@ -142,6 +152,11 @@ func (vh *VoteHandlers) HandleVoteCallback(c telebot.Context) error {
 }
 
 func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
+	if c.Callback() != nil {
+		_ = c.Respond()
+		_ = c.Delete() // удаляем кнопку "Завершить голосование"
+	}
+
 	chatID := c.Chat().ID
 
 	// 1) Завершаем голосование (FSM transition) внутри actor
@@ -170,22 +185,22 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 	if vh.Bot != nil {
 		vh.Bot.Send(&telebot.Chat{ID: chatID}, result, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
+
+	msgIDs, err := vh.GameManager.PopVotePhotoMsgIDs(chatID)
+	if err == nil && vh.Bot != nil {
+		empty := &telebot.ReplyMarkup{} // пустая клавиатура
+
+		for _, id := range msgIDs {
+			m := &telebot.Message{
+				ID:   id,
+				Chat: &telebot.Chat{ID: chatID},
+			}
+
+			if _, e := vh.Bot.EditReplyMarkup(m, empty); e != nil {
+				log.Printf("[WARN] cannot remove keyboard from msg %d: %v", id, e)
+			}
+		}
+	}
+
 	return nil
 }
-
-// // Таймер на голосование (отключен)
-// func (vh *VoteHandlers) voteTimeout(chatID int64, session *game.GameSession) {
-// 	const voteDuration = 33 * time.Second
-
-// 	time.Sleep(voteDuration)
-
-// 	session, exist := vh.GameManager.GetSession(chatID)
-// 	if !exist || session.FSM.Current() != game.VoteState {
-// 		return
-// 	}
-// 	if vh.Bot != nil {
-// 		vh.Bot.Send(&telebot.Chat{ID: chatID}, "⏳ Голосование завершено автоматически!")
-// 	}
-// 	log.Printf("[TIMER] Автоматическое завершение голосования в чате %d", chatID)
-// 	vh.FinishVoting(chatID, session)
-// }

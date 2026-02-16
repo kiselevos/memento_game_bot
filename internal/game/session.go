@@ -25,6 +25,7 @@ type GameSession struct {
 	UsersPhoto       map[int64]string // Хранение фотографий, отпрвленных юзером
 	CarrentTask      string           // Текущее задание
 	IndexPhotoToUser map[int]int64    // Мапа для голосования(Индекс очердности фото к игроку)
+	VotePhotoMsgIDs  map[int]int      // Мапа для хранения msgID для удаления кнопок
 }
 
 var (
@@ -120,9 +121,10 @@ func (s *GameSession) StartVoting() ([]VotePhoto, error) {
 		return nil, ErrFSMState
 	}
 
-	// Чистим предыдущее голоосвание
+	// Чистим предыдущее голосование
 	s.Votes = make(map[int64]int64)
 	s.IndexPhotoToUser = make(map[int]int64)
+	s.VotePhotoMsgIDs = make(map[int]int)
 
 	items := make([]VotePhoto, 0, len(s.UsersPhoto))
 	for uid, pid := range s.UsersPhoto {

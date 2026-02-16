@@ -14,4 +14,5 @@ type BotInterface interface {
 	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
 	ChatMemberOf(chat telebot.Recipient, bot telebot.Recipient) (*telebot.ChatMember, error)
 	Edit(telebot.Editable, interface{}, ...interface{}) (*telebot.Message, error)
+	EditReplyMarkup(telebot.Editable, *telebot.ReplyMarkup) (*telebot.Message, error)
 }
