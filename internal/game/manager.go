@@ -6,12 +6,13 @@ import (
 	"sync"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/tasks"
 )
 
 // GameManager - управляет активными игровыми сессиями
 type GameManager struct {
-	sessions map[int64]*GameSession
-	mu       sync.Mutex
+	actors map[int64]*chatActor
+	mu     sync.Mutex
 
 	stats StatsRecorder
 }
@@ -23,45 +24,74 @@ func NewGameManager(stats StatsRecorder) *GameManager {
 	}
 
 	return &GameManager{
-		sessions: make(map[int64]*GameSession),
-		mu:       sync.Mutex{},
+		actors: make(map[int64]*chatActor),
+		mu:     sync.Mutex{},
 
 		stats: stats,
 	}
 }
 
-// GetSession возвращает GameSession по chatID и bool
-func (gm *GameManager) GetSession(chatID int64) (*GameSession, bool) {
+// Механизм очереди во избежание data race
+func (gm *GameManager) Do(chatID int64, fn func(a *chatActor) error) error {
 	gm.mu.Lock()
-	defer gm.mu.Unlock()
-	session, ok := gm.sessions[chatID]
-	return session, ok
+	a, ok := gm.actors[chatID]
+	if !ok {
+		a = newChatActor(chatID)
+		gm.actors[chatID] = a
+	}
+	gm.mu.Unlock()
+
+	reply := make(chan error, 1)
+	a.inbox <- actorMsg{fn: fn, reply: reply}
+	return <-reply
+}
+
+var (
+	ErrNoSession             = fmt.Errorf("no active session")
+	ErrNoTasksLeft           = fmt.Errorf("no tasks left")
+	ErrRoundNotActive        = fmt.Errorf("round not active")
+	ErrPhotoAlreadySubmitted = fmt.Errorf("photo already submitted")
+)
+
+// Чтобы не тянуть sessions в handlers
+func (gm *GameManager) DoWithSession(chatID int64, fn func(s *GameSession) error) error {
+	return gm.Do(chatID, func(a *chatActor) error {
+		if a.session == nil {
+			return ErrNoSession
+		}
+		return fn(a.session)
+	})
 }
 
 // StartNewGameSession - запускает/перезапускает игру. Все очки стираются.
-func (gm *GameManager) StartNewGameSession(chatID int64, user User) *GameSession {
-	gm.mu.Lock()
+func (gm *GameManager) StartNewGameSession(chatID int64, user User) error {
 
-	log.Printf("[GAME] Игра запущена в чате %d", chatID)
+	err := gm.Do(chatID, func(a *chatActor) error {
+		log.Printf("[GAME] Игра запущена в чате %d", chatID)
 
-	session := &GameSession{
-		ChatID: chatID,
-		FSM:    NewFSM(),
-		Host:   user,
+		session := &GameSession{
+			ChatID: chatID,
+			FSM:    NewFSM(),
+			Host:   user,
 
-		Score:     make(map[int64]int),
-		UsedTasks: make(map[string]bool),
-		UserNames: make(map[int64]string),
+			Score:     make(map[int64]int),
+			UsedTasks: make(map[string]bool),
+			UserNames: make(map[int64]string),
+		}
+
+		session.UserNames[session.Host.ID] = DisplayNameHTML(&user)
+
+		a.session = session
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
-
-	gm.sessions[chatID] = session
-	session.UserNames[session.Host.ID] = DisplayNameHTML(&user)
-	gm.mu.Unlock()
 
 	// Запись новой игровой сессии в БД
 	gm.stats.CreateSessionRecord(chatID)
-
-	return session
+	return nil
 }
 
 // CheckFirstGame - Проверка на первую игру в группе.
@@ -73,26 +103,31 @@ func (gm *GameManager) CheckFirstGame(chatID int64) bool {
 	return first
 }
 
-// StartNewRound - запускает новый раунд в текущей сессии
-func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
-	gm.mu.Lock()
+// Обработка раунда через сессию и запись в DB
+func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (string, error) {
 
-	chatID := session.ChatID
-	prevTask := session.CarrentTask
-	hadPhotos := len(session.UsersPhoto) > 0
+	var (
+		task      string
+		prevTask  string
+		hadPhotos bool
+	)
 
-	log.Printf("[GAME] Новый раунд запущен в чате %d", chatID)
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
 
-	if !SafeTrigger(session.FSM, EventStartRound, "StartNewRound") {
-		gm.mu.Unlock()
-		return fmt.Errorf("oшибка перехода FSM")
+		// Достаем новую task
+		t, err := tl.GetRandomTask(s.UsedTasks)
+		if err != nil {
+			return ErrNoTasksLeft
+		}
+		task = t
+
+		prevTask, hadPhotos, err = s.StartNewRound(task)
+		return err
+	})
+
+	if err != nil {
+		return "", err
 	}
-
-	session.CarrentTask = task
-	session.UsedTasks[task] = true
-	session.UsersPhoto = make(map[int64]string)
-
-	gm.mu.Unlock()
 
 	// Запись таски в DB
 	if prevTask != "" {
@@ -100,48 +135,54 @@ func (gm *GameManager) StartNewRound(session *GameSession, task string) error {
 	}
 	gm.stats.RegisterRoundTask(chatID, task)
 
-	return nil
+	return task, nil
 }
 
-func (gm *GameManager) TakePhoto(chatID int64, user *User, photoID string) {
+func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (userName string, err error) {
 
-	gm.mu.Lock()
+	isNewUser := false
 
-	session, ok := gm.sessions[chatID]
-	if !ok || session == nil {
-		gm.mu.Unlock()
+	err = gm.DoWithSession(chatID, func(s *GameSession) error {
+
+		// Проверяем FSM
+		if s.FSM.Current() != RoundStartState {
+			return ErrRoundNotActive
+		}
+
+		// UsersPhoto nil
+		if s.UsersPhoto == nil {
+			fmt.Println("[ERROR] При запущенном раунде не создался объект UserPhoto")
+		}
+
+		// Уже имеется фото от User (Всплывающее окно что у него уже есть фото)
+		if _, ok := s.UsersPhoto[user.ID]; ok {
+			return ErrPhotoAlreadySubmitted
+		}
+
+		// Проверка на нового User
+		if _, ok := s.UserNames[user.ID]; !ok {
+			isNewUser = true
+		}
+		s.TakePhoto(user, fileID)
+
+		userName = s.GetUserName(user.ID)
+		return nil
+	})
+
+	if err != nil {
 		return
 	}
-
-	// Проверяем на нового юзера
-	_, exist := session.UserNames[user.ID]
-	isNewUser := !exist
-
-	session.TakePhoto(user, photoID)
-
-	gm.mu.Unlock()
 
 	// Запись статистики в DB
 	if isNewUser {
 		gm.stats.RegisterUserLinkedToSession(chatID, *user)
 	}
 	gm.stats.IncrementPhotoSubmission(chatID, user.ID)
+
+	return userName, nil
 }
 
-func (gm *GameManager) StartVoting(session *GameSession) error {
-	gm.mu.Lock()
-	defer gm.mu.Unlock()
-
-	log.Printf("[GAME] Голосование запущено в чате %d", session.ChatID)
-
-	if !SafeTrigger(session.FSM, EventStartVote, "StartVoting") {
-		return fmt.Errorf("oшибка перехода FSM")
-	}
-
-	session.Votes = make(map[int64]int64)
-	return nil
-}
-
+// VOTING PROCESS
 // VoteResult спец тип для ответов или CallBack или Messages
 type VoteResult struct {
 	Message    string
@@ -149,73 +190,85 @@ type VoteResult struct {
 	IsError    bool
 }
 
+func (gm *GameManager) StartVoting(chatID int64) ([]VotePhoto, error) {
+	var photos []VotePhoto
+
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+		items, err := s.StartVoting()
+		if err != nil {
+			return err
+		}
+
+		photos = items
+		return nil
+	})
+
+	return photos, err
+}
+
 func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*VoteResult, error) {
 
-	gm.mu.Lock()
+	var (
+		accepted bool
+		msg      string
+		resErr   error
+	)
 
-	session, exist := gm.sessions[chatID]
-	if !exist || session.FSM.Current() != VoteState {
-		gm.mu.Unlock()
-		return &VoteResult{
-			Message:    messages.VotedEarlier,
-			IsCallback: true,
-		}, nil
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+		accepted, msg, resErr = s.RegisterVote(voter.ID, photoNum)
+		return resErr
+	})
+
+	if err == ErrNoSession {
+		return &VoteResult{Message: messages.GameNotStarted, IsCallback: true, IsError: true}, nil
+	}
+	if err != nil {
+		return &VoteResult{Message: messages.ErrorMessagesForUser, IsCallback: true, IsError: true}, err
 	}
 
-	if _, voted := session.Votes[voter.ID]; voted {
-		gm.mu.Unlock()
-		return &VoteResult{
-			Message:    messages.VotedAlready,
-			IsCallback: true,
-		}, nil
+	// DB — снаружи actor (и только если голос реально принят)
+	if accepted {
+		gm.stats.RecordVote(voter.ID)
+		return &VoteResult{Message: msg, IsCallback: false}, nil
 	}
 
-	targetUserID, ok := session.IndexPhotoToUser[photoNum]
-	if !ok {
-		log.Printf("[ERROR] Неизвестный номер фото %d в чате %d", photoNum, chatID)
-		gm.mu.Unlock()
-		return &VoteResult{
-			Message:    messages.ErrorMessagesForUser,
-			IsCallback: true,
-			IsError:    true,
-		}, fmt.Errorf("unknown photo")
-	}
-
-	// Голосование за себя
-	if targetUserID == voter.ID {
-		gm.mu.Unlock()
-		return &VoteResult{
-			Message:    messages.VotedForSelf,
-			IsCallback: true,
-		}, nil
-	}
-
-	session.Votes[voter.ID] = targetUserID
-	session.Score[targetUserID]++
-
-	msg := fmt.Sprintf("%s проголосовал(а)", session.GetUserName(voter.ID))
-
-	gm.mu.Unlock()
-
-	// Запись статистики голосования
-	gm.stats.RecordVote(voter.ID)
-
-	return &VoteResult{
-		Message:    msg,
-		IsCallback: false,
-	}, nil
+	return &VoteResult{Message: msg, IsCallback: true}, nil
 }
 
-func (gm *GameManager) FinishVoting(session *GameSession) {
-	gm.mu.Lock()
-	defer gm.mu.Unlock()
-
-	SafeTrigger(session.FSM, EventFinishVote, "FinishVoting")
+// Закончить голосование
+func (gm *GameManager) FinishVoting(chatID int64) error {
+	return gm.DoWithSession(chatID, func(s *GameSession) error {
+		return s.FinishVoting()
+	})
 }
 
-func (gm *GameManager) EndGame(chatID int64) {
-	gm.mu.Lock()
-	defer gm.mu.Unlock()
+// Получить очки раунда
+func (gm *GameManager) GetRoundScore(chatID int64) ([]PlayerScore, error) {
+	var scores []PlayerScore
 
-	delete(gm.sessions, chatID)
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+		scores = s.RoundScore()
+		return nil
+	})
+
+	return scores, err
+}
+
+// Получить финальный счет игры
+func (gm *GameManager) GetTotalScore(chatID int64) ([]PlayerScore, error) {
+	var scores []PlayerScore
+
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+		scores = s.TotalScore()
+		return nil
+	})
+
+	return scores, err
+}
+
+func (gm *GameManager) EndGame(chatID int64) error {
+	return gm.Do(chatID, func(a *chatActor) error {
+		a.session = nil
+		return nil
+	})
 }

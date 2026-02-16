@@ -55,6 +55,12 @@ import (
 func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.HandlerFunc {
 	return func(next telebot.HandlerFunc) telebot.HandlerFunc {
 		return func(c telebot.Context) error {
+
+			var (
+				isHost   bool
+				hostName string
+			)
+
 			chat := c.Chat()
 			user := c.Sender()
 
@@ -63,9 +69,13 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 				return next(c)
 			}
 
-			// Достаем сессию
-			session, exist := gm.GetSession(chat.ID)
-			if !exist {
+			err := gm.DoWithSession(chat.ID, func(s *game.GameSession) error {
+				isHost = s.Host.ID == user.ID
+				hostName = s.Host.FirstName
+				return nil
+			})
+
+			if err != nil {
 				log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chat.ID)
 				if c.Callback() != nil {
 					_ = c.Respond()
@@ -73,15 +83,14 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 						Text: messages.GameNotStarted,
 					})
 				}
-
 				return c.Reply(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 			}
 
-			if session.IsHost(user.ID) {
+			if isHost {
 				return next(c)
 			}
 
-			text := fmt.Sprintf(messages.OnlyHostRules, session.Host.FirstName)
+			text := fmt.Sprintf(messages.OnlyHostRules, hostName)
 
 			if c.Callback() != nil {
 				return c.Respond(&telebot.CallbackResponse{

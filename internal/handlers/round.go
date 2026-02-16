@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
@@ -49,13 +50,9 @@ func (rh *RoundHandlers) Register() {
 func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 
 	log.Printf("Callback from: %s", c.Sender().Username)
-	err := c.Respond()
-	if err != nil {
-		log.Printf("Respond error: %v", err)
-	}
-	//Убираем анимацию мерцания кнопки
+
 	if c.Callback() != nil {
-		_ = c.Respond(&telebot.CallbackResponse{})
+		_ = c.Respond()
 	}
 
 	markup := &telebot.ReplyMarkup{}
@@ -63,22 +60,17 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 
-	session, exist := rh.GameManager.GetSession(chatID)
-	if !exist {
-		log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chatID)
-		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
-	}
-
-	task, err := rh.TasksList.GetRandomTask(session.UsedTasks)
+	task, err := rh.GameManager.StartNewRound(chatID, rh.TasksList)
 	if err != nil {
-		log.Printf("[INFO] Все вопросы в чате %d закончены", chatID)
-		rh.GameHandlers.HandleEndGame(c) // автоматический финал
-		return nil
-	}
+		if errors.Is(err, game.ErrNoSession) {
+			return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+		}
+		if errors.Is(err, game.ErrNoTasksLeft) {
+			_ = c.Send(messages.TheEndMessages, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+			return rh.GameHandlers.HandleEndGame(c)
+		}
 
-	err = rh.GameManager.StartNewRound(session, task)
-	if err != nil {
-		log.Printf("[ERROR] Ошибка начала нового раунда %d, %v", chatID, err)
+		log.Printf("[ERROR] Ошибка начала нового раунда %d: %v", chatID, err)
 		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 	}
 

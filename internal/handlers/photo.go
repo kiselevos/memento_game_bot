@@ -38,26 +38,27 @@ func (ph *PhotoHandlers) Register() {
 
 // TakeUserPhoto - обирает фото только в уловиях запущенного раунда.
 func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
-	chat := c.Chat()
+	chatID := c.Chat().ID
 	user := game.GetUserFromTelebot(c.Sender())
-
-	session, exist := ph.GameManager.GetSession(chat.ID)
-	if !exist || session.FSM.Current() != game.RoundStartState {
-		return nil
-	}
 
 	photo := c.Message().Photo
 	if photo == nil {
 		return nil
 	}
-
 	fileID := photo.File.FileID
 
-	_, exist = session.UsersPhoto[user.ID]
-
-	if exist {
-		//TODO: Подумать о функционале, возможно заменять фото???
-		return nil
+	userName, err := ph.GameManager.SubmitPhoto(chatID, &user, fileID)
+	if err != nil {
+		switch err {
+		case game.ErrNoSession:
+			return nil
+		case game.ErrRoundNotActive:
+			return nil
+		case game.ErrPhotoAlreadySubmitted:
+			return nil
+		default:
+			return nil
+		}
 	}
 
 	markup := &telebot.ReplyMarkup{}
@@ -66,10 +67,8 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	// Принимаем и удаялем фото
 	_ = ph.Bot.Delete(c.Message())
 
-	ph.GameManager.TakePhoto(chat.ID, &user, fileID)
-
 	return c.Send(
-		fmt.Sprintf("<b>%s</b>, %s", session.GetUserName(user.ID), messages.PhotoReceived),
+		fmt.Sprintf("<b>%s</b>, %s", userName, messages.PhotoReceived),
 		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
 		markup,
 	)

@@ -43,13 +43,14 @@ func (sh *ScoreHandlers) HandleScore(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{sh.GameHandlers.StartGameBtn}}
 
-	session, exist := sh.GameManager.GetSession(chatID)
-	if !exist {
-		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+	totalScore, err := sh.GameManager.GetTotalScore(chatID)
+
+	if err != nil {
+		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 
 	markup.InlineKeyboard = [][]telebot.InlineButton{{sh.RoundHandlers.StartRoundBtn}}
 
-	result := bot.RenderScore(bot.GameScore, session.TotalScore())
+	result := bot.RenderScore(bot.GameScore, totalScore)
 	return c.Send(result, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }

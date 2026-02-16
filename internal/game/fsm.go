@@ -51,9 +51,10 @@ func (f *FSM) Current() State {
 func (f *FSM) Trigger(event Event) error {
 	next, ok := f.transistions[f.current][event]
 	if !ok {
-		log.Printf("[FSM] %s --(%s)--> %s", f.current, event, next)
+		log.Printf("[FSM] invalid transition: %s --(%s)--> ?", f.current, event)
 		return fmt.Errorf("invalid transition: %s → (%s)", f.current, event)
 	}
+	log.Printf("[FSM] %s --(%s)--> %s", f.current, event, next)
 	f.current = next
 	return nil
 }

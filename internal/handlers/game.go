@@ -102,16 +102,20 @@ func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.StartGameBtn}}
 
-	session, exist := gh.GameManager.GetSession(chatID)
-	if !exist {
+	totalScore, err := gh.GameManager.GetTotalScore(chatID)
+
+	if err != nil {
 		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 
 	markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{gh.FeedbackHandlers.FeedbackBtn})
 
-	result := bot.RenderScore(bot.FinalScore, session.TotalScore())
+	result := bot.RenderScore(bot.FinalScore, totalScore)
 
-	gh.GameManager.EndGame(chatID)
+	err = gh.GameManager.EndGame(chatID)
+	if err != nil {
+		log.Println("[ERROR] Проблема с обнулением session в actors", err)
+	}
 
 	return c.Send(result+"\n"+messages.FinishGameMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 }
