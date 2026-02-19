@@ -216,7 +216,10 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser)
 	}
 
-	result := bot.RenderScore(bot.RoundScore, scores)
+	result := messages.EmptyVotedResult
+	if scores != nil {
+		result = bot.RenderScore(bot.RoundScore, scores)
+	}
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{vh.RoundHandlers.StartRoundBtn}}
