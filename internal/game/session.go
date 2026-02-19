@@ -168,7 +168,7 @@ func (s *GameSession) RegisterVote(voter *User, photoNum int) (bool, string, err
 		s.UserNames[voter.ID] = DisplayNameHTML(voter)
 	}
 
-	return true, fmt.Sprintf("%s проголосовал(а)", DisplayNameHTML(voter)), nil
+	return true, fmt.Sprintf("%s проголосовал(а)", s.GetUserName(voter.ID)), nil
 }
 
 func (s *GameSession) FinishVoting() error {
