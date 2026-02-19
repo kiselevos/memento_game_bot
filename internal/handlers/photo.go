@@ -77,9 +77,8 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
 		markup,
 	)
-	log.Printf("[PHOTO] chatID var=%d c.Chat().ID=%d", chatID, c.Chat().ID)
+
 	if err == nil && msg != nil {
-		log.Printf("[PHOTO] chatID var=%d c.Chat().ID=%d", chatID, c.Chat().ID)
 		if e := ph.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
 			log.Printf("[PHOTO][ERROR] SaveSystemMsgID failed chat=%d msg=%d err=%v", chatID, msg.ID, e)
 		} else {

@@ -12,11 +12,12 @@ import (
 type GameSession struct {
 
 	// Постоянные
-	ChatID    int64            // Номер чата, где идет игра
-	Host      User             // Ведущий игры для управления
-	Score     map[int64]int    // Мапа с очками юзеров
-	UsedTasks map[string]bool  // Для отслеживаания используемых вопросов
-	UserNames map[int64]string //Список участников партии
+	ChatID         int64            // Номер чата, где идет игра
+	Host           User             // Ведущий игры для управления
+	Score          map[int64]int    // Мапа с очками юзеров
+	UsedTasks      map[string]bool  // Для отслеживаания используемых вопросов
+	UserNames      map[int64]string //Список участников партии
+	FinishedRounds int              // Завершенные раунды
 
 	// Обнуляющиеся при новом раунде
 
@@ -180,5 +181,7 @@ func (s *GameSession) FinishVoting() error {
 	if !SafeTrigger(s.FSM, EventFinishVote, "GameSession.FinishVoting") {
 		return ErrFSMState
 	}
+	// Считаем завершенные раунды.
+	s.FinishedRounds++
 	return nil
 }
