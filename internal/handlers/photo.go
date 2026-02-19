@@ -48,14 +48,12 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	}
 	fileID := photo.File.FileID
 
-	userName, err := ph.GameManager.SubmitPhoto(chatID, &user, fileID)
+	userName, replaced, err := ph.GameManager.SubmitPhoto(chatID, &user, fileID)
 	if err != nil {
 		switch err {
 		case game.ErrNoSession:
 			return nil
 		case game.ErrRoundNotActive:
-			return nil
-		case game.ErrPhotoAlreadySubmitted:
 			return nil
 		default:
 			return nil
@@ -68,9 +66,14 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	// Принимаем и удаялем фото
 	_ = ph.Bot.Delete(c.Message())
 
+	text := messages.PhotoReceived
+	if replaced {
+		text = messages.PhotoUpdate
+	}
+
 	msg, err := ph.Bot.Send(
 		c.Chat(),
-		fmt.Sprintf("<b>%s</b>, %s", userName, messages.PhotoReceived),
+		fmt.Sprintf("<b>%s</b>, %s", userName, text),
 		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
 		markup,
 	)

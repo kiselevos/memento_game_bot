@@ -47,10 +47,9 @@ func (gm *GameManager) Do(chatID int64, fn func(a *chatActor) error) error {
 }
 
 var (
-	ErrNoSession             = fmt.Errorf("no active session")
-	ErrNoTasksLeft           = fmt.Errorf("no tasks left")
-	ErrRoundNotActive        = fmt.Errorf("round not active")
-	ErrPhotoAlreadySubmitted = fmt.Errorf("photo already submitted")
+	ErrNoSession      = fmt.Errorf("no active session")
+	ErrNoTasksLeft    = fmt.Errorf("no tasks left")
+	ErrRoundNotActive = fmt.Errorf("round not active")
 )
 
 // Чтобы не тянуть sessions в handlers
@@ -138,7 +137,7 @@ func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (string,
 	return task, nil
 }
 
-func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (userName string, err error) {
+func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (userName string, replaced bool, err error) {
 
 	isNewUser := false
 
@@ -154,17 +153,12 @@ func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (use
 			fmt.Println("[ERROR] При запущенном раунде не создался объект UserPhoto")
 		}
 
-		// Уже имеется фото от User (Всплывающее окно что у него уже есть фото)
-		if _, ok := s.UsersPhoto[user.ID]; ok {
-			return ErrPhotoAlreadySubmitted
-		}
-
 		// Проверка на нового User
 		if _, ok := s.UserNames[user.ID]; !ok {
 			isNewUser = true
 		}
-		s.TakePhoto(user, fileID)
 
+		replaced = s.TakePhoto(user, fileID)
 		userName = s.GetUserName(user.ID)
 		return nil
 	})
@@ -177,9 +171,10 @@ func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (use
 	if isNewUser {
 		gm.stats.RegisterUserLinkedToSession(chatID, *user)
 	}
+
 	gm.stats.IncrementPhotoSubmission(chatID, user.ID)
 
-	return userName, nil
+	return userName, replaced, nil
 }
 
 // VOTING PROCESS

@@ -83,12 +83,17 @@ func (s *GameSession) scoreFromMap(data map[int64]int) []PlayerScore {
 	return result
 }
 
-func (s *GameSession) TakePhoto(user *User, photoID string) {
-	s.UsersPhoto[user.ID] = photoID
+func (s *GameSession) TakePhoto(user *User, photoID string) bool {
 
 	if _, ok := s.UserNames[user.ID]; !ok {
 		s.UserNames[user.ID] = DisplayNameHTML(user)
 	}
+
+	// Проверяем на уже существующее фото.
+	_, existed := s.UsersPhoto[user.ID]
+	s.UsersPhoto[user.ID] = photoID
+
+	return existed
 }
 
 // Начало нового раунда
