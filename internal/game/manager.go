@@ -69,9 +69,10 @@ func (gm *GameManager) StartNewGameSession(chatID int64, user User) error {
 		log.Printf("[GAME] Игра запущена в чате %d", chatID)
 
 		session := &GameSession{
-			ChatID: chatID,
-			FSM:    NewFSM(),
-			Host:   user,
+			ChatID:      chatID,
+			FSM:         NewFSM(),
+			Host:        user,
+			CountRounds: 1,
 
 			Score:     make(map[int64]int),
 			UsedTasks: make(map[string]bool),
@@ -103,15 +104,19 @@ func (gm *GameManager) CheckFirstGame(chatID int64) bool {
 }
 
 // Обработка раунда через сессию и запись в DB
-func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (string, error) {
+func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (int, string, error) {
 
 	var (
+		round     int
 		task      string
 		prevTask  string
 		hadPhotos bool
 	)
 
 	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+
+		// Достаем текущий раунд
+		round = s.CountRounds
 
 		// Достаем новую task
 		t, err := tl.GetRandomTask(s.UsedTasks)
@@ -125,7 +130,7 @@ func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (string,
 	})
 
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 
 	// Запись таски в DB
@@ -134,7 +139,7 @@ func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (string,
 	}
 	gm.stats.RegisterRoundTask(chatID, task)
 
-	return task, nil
+	return round, task, nil
 }
 
 func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (userName string, replaced bool, err error) {

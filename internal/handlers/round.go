@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
@@ -59,7 +60,7 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 
-	task, err := rh.GameManager.StartNewRound(chatID, rh.TasksList)
+	round, task, err := rh.GameManager.StartNewRound(chatID, rh.TasksList)
 	if err != nil {
 		if errors.Is(err, game.ErrNoSession) {
 			return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
@@ -73,7 +74,8 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 	}
 
-	text := messages.RoundStartedMessage + "\n<b>" + task + "</b>"
+	roundMsg := fmt.Sprintf(messages.RoundStartedMessage, round)
+	text := roundMsg + "\n<b>" + task + "</b>"
 
 	btn := rh.StartRoundBtn
 	btn.Text = "🔁 Поменять задание"
