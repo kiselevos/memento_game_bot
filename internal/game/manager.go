@@ -215,7 +215,7 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 	)
 
 	err := gm.DoWithSession(chatID, func(s *GameSession) error {
-		accepted, msg, resErr = s.RegisterVote(voter.ID, photoNum)
+		accepted, msg, resErr = s.RegisterVote(voter, photoNum)
 		return resErr
 	})
 

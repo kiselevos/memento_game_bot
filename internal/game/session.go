@@ -142,13 +142,13 @@ func (s *GameSession) StartVoting() ([]VotePhoto, error) {
 	return items, nil
 }
 
-func (s *GameSession) RegisterVote(voterID int64, photoNum int) (bool, string, error) {
+func (s *GameSession) RegisterVote(voter *User, photoNum int) (bool, string, error) {
 
 	if s.FSM.Current() != VoteState {
 		return false, messages.VotedNotActive, nil
 	}
 
-	if _, voted := s.Votes[voterID]; voted {
+	if _, voted := s.Votes[voter.ID]; voted {
 		return false, messages.VotedAlready, nil
 	}
 
@@ -157,14 +157,18 @@ func (s *GameSession) RegisterVote(voterID int64, photoNum int) (bool, string, e
 		return false, messages.ErrorMessagesForUser, fmt.Errorf("unknown photo num")
 	}
 
-	if targetUserID == voterID {
+	if targetUserID == voter.ID {
 		return false, messages.VotedForSelf, nil
 	}
 
-	s.Votes[voterID] = targetUserID
+	s.Votes[voter.ID] = targetUserID
 	s.Score[targetUserID]++
 
-	return true, fmt.Sprintf("%s проголосовал(а)", s.GetUserName(voterID)), nil
+	if _, ok := s.UserNames[voter.ID]; !ok {
+		s.UserNames[voter.ID] = DisplayNameHTML(voter)
+	}
+
+	return true, fmt.Sprintf("%s проголосовал(а)", DisplayNameHTML(voter)), nil
 }
 
 func (s *GameSession) FinishVoting() error {
