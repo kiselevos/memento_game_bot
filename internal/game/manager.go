@@ -1,11 +1,13 @@
 package game
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/models"
 	"github.com/kiselevos/memento_game_bot/internal/tasks"
 )
 
@@ -15,10 +17,11 @@ type GameManager struct {
 	mu     sync.Mutex
 
 	stats StatsRecorder
+	tasks TaskStore
 }
 
 // NewGameManager создаёт и возвращает новый экземпляр GameManager
-func NewGameManager(stats StatsRecorder) *GameManager {
+func NewGameManager(stats StatsRecorder, tasks TaskStore) *GameManager {
 	if stats == nil {
 		stats = NoopStatsRecorder{}
 	}
@@ -28,6 +31,7 @@ func NewGameManager(stats StatsRecorder) *GameManager {
 		mu:     sync.Mutex{},
 
 		stats: stats,
+		tasks: tasks,
 	}
 }
 
@@ -63,20 +67,37 @@ func (gm *GameManager) DoWithSession(chatID int64, fn func(s *GameSession) error
 }
 
 // StartNewGameSession - запускает/перезапускает игру. Все очки стираются.
-func (gm *GameManager) StartNewGameSession(chatID int64, user User) error {
+func (gm *GameManager) StartNewGameSession(ctx context.Context, chatID int64, user User) error {
 
-	err := gm.Do(chatID, func(a *chatActor) error {
+	// Достаем вопросы для игровой сессии
+	taskList, err := gm.tasks.GetActiveTaskList(ctx, nil)
+	if err != nil || len(taskList) == 0 {
+		log.Printf("[ERROR]load tasks: %s", err)
+		taskList, err = tasks.LoadTasksFromFile()
+		if err != nil {
+			return fmt.Errorf("Problem with backoff loader: %w", err)
+		}
+	}
+
+	tasks.ShuffleTasks(taskList)
+
+	// Запись новой игровой сессии в БД
+	sessionID := gm.stats.CreateSessionRecord(ctx, chatID)
+
+	err = gm.Do(chatID, func(a *chatActor) error {
 		log.Printf("[GAME] Игра запущена в чате %d", chatID)
 
 		session := &GameSession{
+			SessionID:   sessionID,
 			ChatID:      chatID,
 			FSM:         NewFSM(),
 			Host:        user,
 			CountRounds: 1,
+			CarrentTask: models.Task{},
 
 			Score:     make(map[int64]int),
-			UsedTasks: make(map[string]bool),
 			UserNames: make(map[int64]string),
+			Tasks:     taskList,
 		}
 
 		session.UserNames[session.Host.ID] = DisplayNameHTML(&user)
@@ -89,43 +110,31 @@ func (gm *GameManager) StartNewGameSession(chatID int64, user User) error {
 		return err
 	}
 
-	// Запись новой игровой сессии в БД
-	gm.stats.CreateSessionRecord(chatID)
 	return nil
 }
 
 // CheckFirstGame - Проверка на первую игру в группе.
-func (gm *GameManager) CheckFirstGame(chatID int64) bool {
-	first, err := gm.stats.IsFirstGame(chatID)
-	if err != nil {
-		return false
-	}
-	return first
+func (gm *GameManager) CheckFirstGame(ctx context.Context, chatID int64) bool {
+	return gm.stats.IsFirstGame(ctx, chatID)
+
 }
 
 // Обработка раунда через сессию и запись в DB
-func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (int, string, error) {
+func (gm *GameManager) StartNewRound(ctx context.Context, chatID int64) (int, string, error) {
 
 	var (
-		round     int
-		task      string
-		prevTask  string
-		hadPhotos bool
+		round      int
+		newTask    models.Task
+		prevTaskID int64
+		countPhoto int
 	)
 
 	err := gm.DoWithSession(chatID, func(s *GameSession) error {
-
 		// Достаем текущий раунд
 		round = s.CountRounds
 
-		// Достаем новую task
-		t, err := tl.GetRandomTask(s.UsedTasks)
-		if err != nil {
-			return ErrNoTasksLeft
-		}
-		task = t
-
-		prevTask, hadPhotos, err = s.StartNewRound(task)
+		var err error
+		prevTaskID, countPhoto, newTask, err = s.StartNewRound()
 		return err
 	})
 
@@ -134,15 +143,14 @@ func (gm *GameManager) StartNewRound(chatID int64, tl *tasks.TasksList) (int, st
 	}
 
 	// Запись таски в DB
-	if prevTask != "" {
-		gm.stats.IncrementTaskUsage(prevTask, hadPhotos)
+	if prevTaskID != 0 {
+		gm.stats.IncrementTaskUsage(ctx, prevTaskID, int64(countPhoto))
 	}
-	gm.stats.RegisterRoundTask(chatID, task)
 
-	return round, task, nil
+	return round, newTask.Text, nil
 }
 
-func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (userName string, replaced bool, err error) {
+func (gm *GameManager) SubmitPhoto(ctx context.Context, chatID int64, user *User, fileID string) (userName string, replaced bool, err error) {
 
 	isNewUser := false
 
@@ -174,10 +182,8 @@ func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (use
 
 	// Запись статистики в DB
 	if isNewUser {
-		gm.stats.RegisterUserLinkedToSession(chatID, *user)
+		gm.stats.StatsForStartNewGame(ctx, *user)
 	}
-
-	gm.stats.IncrementPhotoSubmission(chatID, user.ID)
 
 	return userName, replaced, nil
 }
@@ -226,20 +232,29 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 		return &VoteResult{Message: messages.ErrorMessagesForUser, IsCallback: true, IsError: true}, err
 	}
 
-	// DB — снаружи actor (и только если голос реально принят)
 	if accepted {
-		gm.stats.RecordVote(voter.ID)
 		return &VoteResult{Message: msg, IsCallback: false}, nil
 	}
 
 	return &VoteResult{Message: msg, IsCallback: true}, nil
 }
 
-// Закончить голосование
-func (gm *GameManager) FinishVoting(chatID int64) error {
-	return gm.DoWithSession(chatID, func(s *GameSession) error {
-		return s.FinishVoting()
+// Закончить голосование и получить очки
+func (gm *GameManager) FinishVoting(ctx context.Context, chatID int64) ([]PlayerScore, error) {
+
+	var scores []PlayerScore
+
+	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+		if err := s.FinishVoting(); err != nil {
+			return err
+		}
+		scores = s.RoundScore()
+		return nil
 	})
+
+	gm.stats.UsersVotesStatsUpdate(ctx, scores)
+
+	return scores, err
 }
 
 // Сохранеям в сессии фото msg_id для последующего удаления
@@ -289,18 +304,6 @@ func (gm *GameManager) PopMsgIDs(chatID int64) (CleanupIDs, error) {
 	return out, err
 }
 
-// Получить очки раунда
-func (gm *GameManager) GetRoundScore(chatID int64) ([]PlayerScore, error) {
-	var scores []PlayerScore
-
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
-		scores = s.RoundScore()
-		return nil
-	})
-
-	return scores, err
-}
-
 // Получить финальный счет игры
 func (gm *GameManager) GetTotalScore(chatID int64) ([]PlayerScore, error) {
 	var scores []PlayerScore
@@ -313,9 +316,25 @@ func (gm *GameManager) GetTotalScore(chatID int64) ([]PlayerScore, error) {
 	return scores, err
 }
 
-func (gm *GameManager) EndGame(chatID int64) error {
-	return gm.Do(chatID, func(a *chatActor) error {
+func (gm *GameManager) EndGame(ctx context.Context, chatID int64) error {
+	var sessionID int64
+
+	err := gm.Do(chatID, func(a *chatActor) error {
+
+		sessionID = a.session.SessionID
+
 		a.session = nil
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	if sessionID != 0 {
+		gm.stats.FinishSessionRecord(ctx, sessionID)
+	}
+
+	return nil
+
 }

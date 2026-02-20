@@ -1,15 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/bot/middleware"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 	"github.com/kiselevos/memento_game_bot/internal/game"
-	"github.com/kiselevos/memento_game_bot/internal/tasks"
 
 	"gopkg.in/telebot.v3"
 )
@@ -17,19 +18,17 @@ import (
 type RoundHandlers struct {
 	Bot         botinterface.BotInterface
 	GameManager *game.GameManager
-	TasksList   *tasks.TasksList
 
 	GameHandlers *GameHandlers
 
 	StartRoundBtn telebot.InlineButton
 }
 
-func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager, tl *tasks.TasksList) *RoundHandlers {
+func NewRoundHandlers(bot botinterface.BotInterface, gm *game.GameManager) *RoundHandlers {
 
 	h := &RoundHandlers{
 		Bot:         bot,
 		GameManager: gm,
-		TasksList:   tl,
 	}
 	h.StartRoundBtn = telebot.InlineButton{
 		Unique: "start_round",
@@ -55,12 +54,15 @@ func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{rh.GameHandlers.StartGameBtn}}
 
 	chatID := c.Chat().ID
 
-	round, task, err := rh.GameManager.StartNewRound(chatID, rh.TasksList)
+	round, task, err := rh.GameManager.StartNewRound(ctx, chatID)
 	if err != nil {
 		if errors.Is(err, game.ErrNoSession) {
 			return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)

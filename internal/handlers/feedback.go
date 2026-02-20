@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"strings"
+	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 	"github.com/kiselevos/memento_game_bot/internal/feedback"
+	"github.com/kiselevos/memento_game_bot/internal/repositories"
 
 	"gopkg.in/telebot.v3"
 )
@@ -16,16 +20,24 @@ type FeedbackHandlers struct {
 	FeedbackManager *feedback.FeedbackManager
 	AdminsID        []int64
 	BotUsername     string
+	feedbackRepo    *repositories.FeedbackRepo
 
 	FeedbackBtn telebot.InlineButton
 }
 
-func NewFeedbackHandler(bot botinterface.BotInterface, fm *feedback.FeedbackManager, adminsID []int64, botName string) *FeedbackHandlers {
+func NewFeedbackHandler(
+	bot botinterface.BotInterface,
+	fm *feedback.FeedbackManager,
+	adminsID []int64,
+	botName string,
+	fr *repositories.FeedbackRepo,
+) *FeedbackHandlers {
 	h := &FeedbackHandlers{
 		Bot:             bot,
 		FeedbackManager: fm,
 		AdminsID:        adminsID,
 		BotUsername:     botName,
+		feedbackRepo:    fr,
 	}
 
 	h.FeedbackBtn = telebot.InlineButton{
@@ -88,25 +100,34 @@ func (fh *FeedbackHandlers) HandelFeedbackText(c telebot.Context) error {
 
 	userID := c.Sender().ID
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if !fh.FeedbackManager.IsWaitingFeedback(userID) {
 		return nil
 	}
 
 	fh.FeedbackManager.CancelFeedback(userID)
 
+	// Ответ юзеру с боагодарностью за feedback
 	if err := c.Send(messages.ThanksFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}); err != nil {
 		log.Println("[ERROR] Проблема с отравкой ообщения после отзыва:", err)
 	}
 
+	msg := strings.TrimSpace(c.Text())
+	if msg != "" {
+		if err := fh.feedbackRepo.Create(ctx, userID, c.Sender().Username, c.Sender().FirstName, msg); err != nil {
+			log.Printf("[FEEDBACK][WARN] save failed: user=%d err=%v", userID, err)
+		}
+	}
+
 	for _, adminID := range fh.AdminsID {
-		adminMsg := fmt.Sprintf("📬 Новый отзыв от @%s (%d):\n\n%s", c.Sender().Username, userID, c.Text())
+		adminMsg := fmt.Sprintf("📬 Новый отзыв от @%s (%d):\n\n%s", c.Sender().Username, userID, msg)
 		log.Println("[INFO]" + adminMsg)
 		if _, err := fh.Bot.Send(&telebot.User{ID: adminID}, adminMsg); err != nil {
 			log.Println("[ERROR] Проблема с отравкой ообщения после отзыва:", err)
 		}
 	}
-
-	// TODO: сохранять в БД
 
 	return nil
 }

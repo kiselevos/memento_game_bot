@@ -3,6 +3,8 @@ package game
 import (
 	"reflect"
 	"testing"
+
+	"github.com/kiselevos/memento_game_bot/internal/models"
 )
 
 const (
@@ -19,11 +21,10 @@ func newTestGameSession() *GameSession {
 	return &GameSession{
 		ChatID:           chat,
 		Score:            map[int64]int{userID_1: 2, userID_2: 5, userID_3: 0},
-		UsedTasks:        make(map[string]bool),
 		UserNames:        map[int64]string{userID_1: userName_1, userID_2: userName_2, userID_3: userName_3},
 		Votes:            make(map[int64]int64),
 		UsersPhoto:       make(map[int64]string),
-		CarrentTask:      "Задание",
+		CarrentTask:      models.Task{ID: 1, Text: "Задание"},
 		IndexPhotoToUser: make(map[int]int64),
 		FSM:              NewFSM(),
 	}

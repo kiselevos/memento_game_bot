@@ -1,22 +1,24 @@
 package game
 
+import (
+	"context"
+)
+
 type StatsRecorder interface {
-	CreateSessionRecord(chatID int64)
-	RegisterUserLinkedToSession(chatID int64, user User)
-	IncrementPhotoSubmission(chatID int64, userID int64)
-	RecordVote(voterID int64)
-	IncrementTaskUsage(task string, hadPhotos bool)
-	RegisterRoundTask(chatID int64, task string)
-	IsFirstGame(chatID int64) (bool, error)
+	IncrementTaskUsage(ctx context.Context, taskID, countPhoto int64)
+	StatsForStartNewGame(ctx context.Context, user User)
+	UsersVotesStatsUpdate(ctx context.Context, scores []PlayerScore)
+	CreateSessionRecord(ctx context.Context, chatID int64) int64
+	FinishSessionRecord(ctx context.Context, chatID int64)
+	IsFirstGame(ctx context.Context, chatID int64) bool
 }
 
 // NoopStatsRecorder — дефолт: ничего не делает.
 type NoopStatsRecorder struct{}
 
-func (NoopStatsRecorder) CreateSessionRecord(chatID int64)                    {}
-func (NoopStatsRecorder) RegisterUserLinkedToSession(chatID int64, user User) {}
-func (NoopStatsRecorder) IncrementPhotoSubmission(chatID int64, userID int64) {}
-func (NoopStatsRecorder) RecordVote(voterID int64)                            {}
-func (NoopStatsRecorder) IncrementTaskUsage(task string, hadPhotos bool)      {}
-func (NoopStatsRecorder) RegisterRoundTask(chatID int64, task string)         {}
-func (NoopStatsRecorder) IsFirstGame(chatID int64) (bool, error)              { return true, nil }
+func (NoopStatsRecorder) IncrementTaskUsage(ctx context.Context, taskID, countPhoto int64) {}
+func (NoopStatsRecorder) StatsForStartNewGame(ctx context.Context, user User)              {}
+func (NoopStatsRecorder) UsersVotesStatsUpdate(ctx context.Context, scores []PlayerScore)  {}
+func (NoopStatsRecorder) CreateSessionRecord(ctx context.Context, chatID int64) int64      { return 0 }
+func (NoopStatsRecorder) FinishSessionRecord(ctx context.Context, chatID int64)            {}
+func (NoopStatsRecorder) IsFirstGame(ctx context.Context, chatID int64) bool               { return false }

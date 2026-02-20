@@ -11,8 +11,6 @@ import (
 	"github.com/kiselevos/memento_game_bot/internal/handlers"
 	"github.com/kiselevos/memento_game_bot/internal/logging"
 	"github.com/kiselevos/memento_game_bot/internal/repositories"
-	"github.com/kiselevos/memento_game_bot/internal/stats"
-	"github.com/kiselevos/memento_game_bot/internal/tasks"
 
 	tb "gopkg.in/telebot.v3"
 )
@@ -32,11 +30,13 @@ func main() {
 	}
 
 	// Repository
-	userRepo := repositories.NewUserRepository(database)
-	sessionRepo := repositories.NewSessionRepository(database)
-	taskRepo := repositories.NewTaskRepository(database)
+	userRepo := repositories.NewUserRepo(database)
+	sessionRepo := repositories.NewSessionRepo(database)
+	taskRepo := repositories.NewTaskRepo(database)
+	feedbackRepo := repositories.NewFeedbackRepo(database)
 
-	rec := stats.NewPgRecorder(userRepo, sessionRepo, taskRepo)
+	rec := repositories.NewRecorder(userRepo, taskRepo, sessionRepo)
+	tasks := repositories.NewTaskStore(taskRepo)
 
 	// Tg settings
 	pref := tb.Settings{
@@ -54,15 +54,10 @@ func main() {
 
 	botInfo := b.Me
 
-	// Инициализация GameManager
-	tl, err := tasks.NewTasksList("assets/tasks.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	gm := game.NewGameManager(rec)
+	gm := game.NewGameManager(rec, tasks)
 	fm := feedback.NewFeedbackManager(conf.Bot.FeedbackTTL)
 
-	h := handlers.NewHandlers(b, fm, conf.Admin.AdminsID, botInfo, gm, tl)
+	h := handlers.NewHandlers(b, fm, feedbackRepo, conf.Admin.AdminsID, botInfo, gm)
 	h.RegisterAll()
 
 	log.Println("Bot starts...")

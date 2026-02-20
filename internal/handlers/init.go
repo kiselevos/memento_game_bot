@@ -4,7 +4,7 @@ import (
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 	"github.com/kiselevos/memento_game_bot/internal/feedback"
 	"github.com/kiselevos/memento_game_bot/internal/game"
-	"github.com/kiselevos/memento_game_bot/internal/tasks"
+	"github.com/kiselevos/memento_game_bot/internal/repositories"
 
 	"gopkg.in/telebot.v3"
 )
@@ -21,18 +21,18 @@ type Handlers struct {
 func NewHandlers(
 	bot botinterface.BotInterface,
 	fm *feedback.FeedbackManager,
+	fr *repositories.FeedbackRepo,
 	adminsID []int64,
 	botInfo *telebot.User,
 	gm *game.GameManager,
-	tl *tasks.TasksList,
 ) *Handlers {
 
 	h := &Handlers{
 		Game:     NewGameHandlers(bot, gm, botInfo),
-		Round:    NewRoundHandlers(bot, gm, tl),
+		Round:    NewRoundHandlers(bot, gm),
 		Vote:     NewVoteHandlers(bot, gm),
 		Score:    NewScoreHandlers(bot, gm),
-		Feedback: NewFeedbackHandler(bot, fm, adminsID, botInfo.Username),
+		Feedback: NewFeedbackHandler(bot, fm, adminsID, botInfo.Username, fr),
 		Photo:    NewPhotoHandlers(bot, gm),
 	}
 

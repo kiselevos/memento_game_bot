@@ -6,25 +6,27 @@ import (
 	"sort"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/models"
 )
 
 // GameSession - Хранит данные о конкретной партии игры
 type GameSession struct {
 
 	// Постоянные
+	SessionID   int64            // ID сессии для статистики
 	ChatID      int64            // Номер чата, где идет игра
 	Host        User             // Ведущий игры для управления
 	Score       map[int64]int    // Мапа с очками юзеров
-	UsedTasks   map[string]bool  // Для отслеживаания используемых вопросов
 	UserNames   map[int64]string //Список участников партии
 	CountRounds int              // Сыгранные раунды
+	Tasks       []models.Task    // Задания для данной игры
 
 	// Обнуляющиеся при новом раунде
 
 	FSM              *FSM             // Машина состояний
 	Votes            map[int64]int64  // Кто кому отдал свой голос в раунде
 	UsersPhoto       map[int64]string // Хранение фотографий, отпрвленных юзером
-	CarrentTask      string           // Текущее задание
+	CarrentTask      models.Task      // Текущее задание
 	IndexPhotoToUser map[int]int64    // Мапа для голосования(Индекс очердности фото к игроку)
 	VotePhotoMsgIDs  map[int]int      // Мапа для хранения msgID для удаления кнопок
 	SystemMsgIDs     []int            // Слайс для хранения msgID для удаления системных сообщений
@@ -98,19 +100,31 @@ func (s *GameSession) TakePhoto(user *User, photoID string) bool {
 }
 
 // Начало нового раунда
-func (s *GameSession) StartNewRound(task string) (prevTask string, hadPhotos bool, err error) {
-	prevTask = s.CarrentTask
-	hadPhotos = len(s.UsersPhoto) > 0
+func (s *GameSession) StartNewRound() (prevTaskID int64, countPhoto int, task models.Task, err error) {
+	prevTaskID = s.CarrentTask.ID
+	countPhoto = len(s.UsersPhoto)
+
+	newTask := models.Task{}
 
 	if !SafeTrigger(s.FSM, EventStartRound, "GameSession.StartNewRound") {
-		return prevTask, hadPhotos, ErrFSMState
+		return prevTaskID, 0, newTask, ErrFSMState
 	}
 
-	s.CarrentTask = task
-	s.UsedTasks[task] = true
-	s.UsersPhoto = make(map[int64]string)
+	s.CarrentTask, err = s.NextTask()
+	if err != nil {
+		return prevTaskID, countPhoto, newTask, err
+	}
 
-	return prevTask, hadPhotos, nil
+	newTask = s.CarrentTask
+
+	// готовимсся к новому раунду
+	s.UsersPhoto = make(map[int64]string)
+	// Чистим предыдущее голосование
+	s.Votes = make(map[int64]int64)
+	s.IndexPhotoToUser = make(map[int]int64)
+	s.VotePhotoMsgIDs = make(map[int]int)
+
+	return prevTaskID, countPhoto, newTask, nil
 }
 
 type VotePhoto struct {
@@ -127,11 +141,6 @@ func (s *GameSession) StartVoting() ([]VotePhoto, error) {
 	if !SafeTrigger(s.FSM, EventStartVote, "GameSession.StartVoting") {
 		return nil, ErrFSMState
 	}
-
-	// Чистим предыдущее голосование
-	s.Votes = make(map[int64]int64)
-	s.IndexPhotoToUser = make(map[int]int64)
-	s.VotePhotoMsgIDs = make(map[int]int)
 
 	items := make([]VotePhoto, 0, len(s.UsersPhoto))
 	for uid, pid := range s.UsersPhoto {
@@ -184,4 +193,19 @@ func (s *GameSession) FinishVoting() error {
 	// Считаем завершенные раунды.
 	s.CountRounds++
 	return nil
+}
+
+// Получение нового вопроса
+func (s *GameSession) NextTask() (models.Task, error) {
+	if len(s.Tasks) == 0 {
+		return models.Task{}, ErrNoTasksLeft
+	}
+
+	// Вопросы уже перемешаны, берем последний и удаляем его
+	lastIndex := len(s.Tasks) - 1
+	task := s.Tasks[lastIndex]
+
+	s.Tasks = s.Tasks[:lastIndex]
+
+	return task, nil
 }

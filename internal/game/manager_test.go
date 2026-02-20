@@ -1,6 +1,7 @@
 package game
 
 import (
+	"context"
 	"sync"
 	"testing"
 )
@@ -10,12 +11,12 @@ const (
 )
 
 func newTestGameManager() *GameManager {
-	return NewGameManager(NoopStatsRecorder{})
+	return NewGameManager(NoopStatsRecorder{}, NoopTaskStore{})
 }
 
 func seedSession(t *testing.T, gm *GameManager, id int64) {
 	t.Helper()
-	if err := gm.StartNewGameSession(id, User{ID: 1}); err != nil {
+	if err := gm.StartNewGameSession(context.Background(), id, User{ID: 1}); err != nil {
 		t.Fatalf("StartNewGameSession error: %v", err)
 	}
 }
@@ -25,7 +26,7 @@ func seedRoundWithOnePhoto(t *testing.T, gm *GameManager, id int64) {
 
 	err := gm.DoWithSession(id, func(s *GameSession) error {
 		// запускаем раунд через доменный метод (правильно создаст UsersPhoto)
-		_, _, err := s.StartNewRound("task_1")
+		_, _, _, err := s.StartNewRound()
 		if err != nil {
 			return err
 		}
@@ -78,7 +79,7 @@ func TestEndGame_RemovesSession(t *testing.T) {
 	gm := newTestGameManager()
 	seedSession(t, gm, chatID)
 
-	if err := gm.EndGame(chatID); err != nil {
+	if err := gm.EndGame(context.Background(), chatID); err != nil {
 		t.Fatalf("EndGame error: %v", err)
 	}
 
@@ -99,7 +100,7 @@ func TestConcurrentAccess_StartAndReadSessions(t *testing.T) {
 		go func(id int64) {
 			defer wg.Done()
 
-			if err := gm.StartNewGameSession(id, User{ID: 1}); err != nil {
+			if err := gm.StartNewGameSession(context.Background(), id, User{ID: 1}); err != nil {
 				t.Errorf("StartNewGameSession(%d) error: %v", id, err)
 				return
 			}
@@ -196,7 +197,7 @@ func TestFinishVoting_MovesToWaiting(t *testing.T) {
 		t.Fatalf("StartVoting error: %v", err)
 	}
 
-	if err := gm.FinishVoting(chatID); err != nil {
+	if _, err := gm.FinishVoting(context.Background(), chatID); err != nil {
 		t.Fatalf("FinishVoting error: %v", err)
 	}
 
@@ -245,7 +246,7 @@ func TestRegisterVote_SuccessAndBlocksDoubleVoteAndSelfVote(t *testing.T) {
 
 	// self-vote: нужно чтобы voter был в IndexPhotoToUser. Сделаем второй раунд, добавим фото от voter.
 	err = gm.DoWithSession(chatID, func(s *GameSession) error {
-		_, _, e := s.StartNewRound("task_2")
+		_, _, _, e := s.StartNewRound()
 		if e != nil {
 			return e
 		}

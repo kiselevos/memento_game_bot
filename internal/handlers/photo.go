@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
@@ -42,13 +44,16 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	chatID := c.Chat().ID
 	user := game.GetUserFromTelebot(c.Sender())
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	photo := c.Message().Photo
 	if photo == nil {
 		return nil
 	}
 	fileID := photo.File.FileID
 
-	userName, replaced, err := ph.GameManager.SubmitPhoto(chatID, &user, fileID)
+	userName, replaced, err := ph.GameManager.SubmitPhoto(ctx, chatID, &user, fileID)
 	if err != nil {
 		switch err {
 		case game.ErrNoSession:

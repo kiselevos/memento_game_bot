@@ -1,6 +1,10 @@
 package repositories
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+
 	"github.com/kiselevos/memento_game_bot/internal/db"
 	"github.com/kiselevos/memento_game_bot/internal/models"
 )
@@ -13,71 +17,62 @@ type SessionRepositoryInterface interface {
 	AddPhotosCount(chatID int64) error
 }
 
-type SessionRepository struct {
-	DataBase *db.Db
+type SessionRepo struct {
+	db *sql.DB
 }
 
-func NewSessionRepository(db *db.Db) *SessionRepository {
-	return &SessionRepository{
-		DataBase: db,
+func NewSessionRepo(db *db.Db) *SessionRepo {
+	return &SessionRepo{
+		db: db.DB,
 	}
 }
 
-func (repo *SessionRepository) Create(session *models.Session) (*models.Session, error) {
-	repo.DataBase.
-		Model(&models.Session{}).
-		Where("chat_id = ?", session.ChatID).
-		Update("is_active", false)
+// Добавляем сессию
+func (repo *SessionRepo) CreateSession(ctx context.Context, chatID int64) (int64, error) {
 
-	result := repo.DataBase.DB.Create(session)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return session, nil
-}
+	var id int64
 
-func (repo *SessionRepository) GetSessionByID(chatID int64) (*models.Session, error) {
+	err := repo.db.QueryRowContext(ctx, `
+INSERT INTO sessions (chat_id, started_at)
+VALUES ($1, now())
+RETURNING id
+`, chatID).Scan(&id)
 
-	var session models.Session
-	result := repo.DataBase.
-		Where("chat_id = ? AND is_active = true", chatID).
-		First(&session)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return &session, nil
-}
-
-func (repo *SessionRepository) ChangeIsActive(chatID int64) error {
-	session, err := repo.GetSessionByID(chatID)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("sessions create: %w", err)
 	}
-	session.IsActive = false
-	result := repo.DataBase.Save(session)
-	if result.Error != nil {
-		return result.Error
+
+	return id, nil
+}
+
+// Завершение сессии
+func (repo *SessionRepo) FinishSession(ctx context.Context, sessionID int64) error {
+	_, err := repo.db.ExecContext(ctx, `
+UPDATE sessions
+SET ended_at = now()
+WHERE id = $1
+`, sessionID)
+
+	if err != nil {
+		return fmt.Errorf("sessions end: %w", err)
 	}
 
 	return nil
 }
 
-// AddUserToSession - many to many table
-func (repo *SessionRepository) AddUserToSession(session *models.Session, user *models.User) error {
-	return repo.DataBase.Model(session).Association("Users").Append(user)
-}
-
-func (repo *SessionRepository) AddPhotosCount(chatID int64) error {
-
-	session, err := repo.GetSessionByID(chatID)
+// Проверка на наличие игор в чате
+func (repo *SessionRepo) HasAnySession(ctx context.Context, chatID int64) (bool, error) {
+	var exists bool
+	err := repo.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM sessions
+  WHERE chat_id = $1
+  LIMIT 1
+)
+`, chatID).Scan(&exists)
 	if err != nil {
-		return err
+		return false, fmt.Errorf("sessions exists: %w", err)
 	}
-	session.PhotosCount++
-	result := repo.DataBase.Save(session)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+	return exists, nil
 }

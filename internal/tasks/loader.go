@@ -2,17 +2,20 @@ package tasks
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
+
+	"github.com/kiselevos/memento_game_bot/internal/models"
 )
 
-func loadTasksFromFile(filename string) ([]string, error) {
+func LoadTasksFromFile() ([]models.Task, error) {
 
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile("../assets/tasks.json")
 	if err != nil {
 		return nil, err
 	}
 
-	var tasks []string
+	var tasks []models.Task
 
 	err = json.Unmarshal(data, &tasks)
 	if err != nil {
@@ -20,4 +23,10 @@ func loadTasksFromFile(filename string) ([]string, error) {
 	}
 
 	return tasks, nil
+}
+
+func ShuffleTasks(tasks []models.Task) {
+	rand.Shuffle(len(tasks), func(i, j int) {
+		tasks[i], tasks[j] = tasks[j], tasks[i]
+	})
 }

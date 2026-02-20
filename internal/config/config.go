@@ -19,11 +19,12 @@ type Config struct {
 }
 
 type DbConfig struct {
-	Dsn         string
-	MaxAttempts int
-	Delay       time.Duration
-	MaxDelay    time.Duration
-	PingTimeout time.Duration
+	Dsn             string
+	MaxAttempts     int
+	Delay           time.Duration
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
 }
 
 type TgConfig struct {
@@ -48,9 +49,12 @@ func GetBotConfig() BotConfig {
 
 func GetDbConfig() DbConfig {
 	return DbConfig{
-		Dsn:         GetDsn(),
-		Delay:       envDuration("DB_DELAY_CONNECTION", 2*time.Second),
-		MaxAttempts: envInt("DB_MAX_ATTEMPTS", 5),
+		Dsn:             GetDsn(),
+		Delay:           envDuration("DB_DELAY_CONNECTION", 2*time.Second),
+		MaxAttempts:     envInt("DB_MAX_ATTEMPTS", 5),
+		MaxOpenConns:    envInt("DB_MAX_OPEN_CONN", 10),
+		MaxIdleConns:    envInt("DB_MAX_IDLE_CONN", 5),
+		ConnMaxLifetime: envDuration("DB_MAX_LIFETIME_CONN", 30*time.Minute),
 	}
 }
 

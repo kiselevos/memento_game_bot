@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/bot"
@@ -74,6 +76,9 @@ func (gh *GameHandlers) Start(c telebot.Context) error {
 // StartGame - работает из любого места, начинает новую сессию, заканчивая старую
 func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if c.Callback() != nil {
 		if err := c.Respond(); err != nil {
 			log.Printf("[WARN] Respond error: %v", err)
@@ -95,7 +100,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	})
 
 	if err != nil {
-		if gh.GameManager.CheckFirstGame(chatID) {
+		if gh.GameManager.CheckFirstGame(ctx, chatID) {
 			if gh.Bot != nil {
 				gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 				bot.WaitingAnimation(c, gh.Bot, 5)
@@ -107,7 +112,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
 		text := fmt.Sprintf(messages.GameStartedWithHost, game.DisplayNameHTML(&user))
 
-		gh.GameManager.StartNewGameSession(chatID, user)
+		gh.GameManager.StartNewGameSession(ctx, chatID, user)
 
 		return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
@@ -128,10 +133,13 @@ func (gh *GameHandlers) ConfirmNewGame(c telebot.Context) error {
 		_ = c.Respond(&telebot.CallbackResponse{Text: messages.RestartGameMsg})
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	chatID := c.Chat().ID
 	user := game.GetUserFromTelebot(c.Sender())
 
-	if err := gh.GameManager.StartNewGameSession(chatID, user); err != nil {
+	if err := gh.GameManager.StartNewGameSession(ctx, chatID, user); err != nil {
 		log.Printf("[ERROR] StartNewGameSession: %v", err)
 		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 	}
@@ -157,6 +165,9 @@ func (gh *GameHandlers) CancelRestart(c telebot.Context) error {
 func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 	chatID := c.Chat().ID
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.StartGameBtn}}
 
@@ -170,7 +181,7 @@ func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 
 	result := bot.RenderScore(bot.FinalScore, totalScore)
 
-	err = gh.GameManager.EndGame(chatID)
+	err = gh.GameManager.EndGame(ctx, chatID)
 	if err != nil {
 		log.Println("[ERROR] Проблема с обнулением session в actors", err)
 	}

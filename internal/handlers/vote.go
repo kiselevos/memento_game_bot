@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/bot"
@@ -190,8 +192,12 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// 1) Завершаем голосование (FSM transition) внутри actor
-	if err := vh.GameManager.FinishVoting(chatID); err != nil {
+	scores, err := vh.GameManager.FinishVoting(ctx, chatID)
+	if err != nil {
 		switch err {
 		case game.ErrNoSession:
 			return c.Send(messages.GameNotStarted)
@@ -208,12 +214,6 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 		vh.cleanupRoundArtifacts(chatID, cleanID)
 	} else {
 		log.Printf("[CLEANUP][WARN] PopMsgIDs failed: chat=%d err=%v", chatID, err)
-	}
-
-	// 2) Забираем результаты раунда внутри actor
-	scores, err := vh.GameManager.GetRoundScore(chatID)
-	if err != nil {
-		return c.Send(messages.ErrorMessagesForUser)
 	}
 
 	result := messages.EmptyVotedResult
