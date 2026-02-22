@@ -3,7 +3,7 @@ services:
     build:
       context: .
       args:
-        APP_PATH: ./cmd/main
+        APP_PATH: ./cmd/main.go
     container_name: memento_bot
     env_file:
       - .env

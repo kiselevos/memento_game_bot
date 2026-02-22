@@ -24,7 +24,7 @@ run: ## Запуск бота локально (Подключение к DB в 
 	@go run ./cmd/main.go
 
 DB_COMPOSE=docker-compose.db.yml
-BOT_COMPOSE=docker-compose.bot.yml
+BOT_COMPOSE=docker-compose.yml
 
 .PHONY: network
 network: ## Создать общую docker сеть (если нет)
