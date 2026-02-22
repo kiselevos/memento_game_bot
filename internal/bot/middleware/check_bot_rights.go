@@ -2,12 +2,16 @@ package middleware
 
 import (
 	"errors"
-	"log"
+	"fmt"
 
-	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 
 	"gopkg.in/telebot.v3"
+)
+
+var (
+	ErrBotNotAdmin          = errors.New("bot is not admin")
+	ErrBotStatusUnavailable = errors.New("bot status unavailable")
 )
 
 // CheckBotAdminRights - проверка является ли бот админом
@@ -15,23 +19,18 @@ func CheckBotAdminRights(c telebot.Context, botUser *telebot.User, bot botinterf
 
 	chat := c.Chat()
 
-	if c.Chat().Type == telebot.ChatPrivate {
+	if chat.Type == telebot.ChatPrivate {
 		return nil
 	}
 
 	member, err := bot.ChatMemberOf(chat, botUser)
 	if err != nil {
-		log.Printf("[ERROR] Не удалось получить статус бота в чате: %v", err)
-		c.Send(messages.ErrorMessagesForUser)
-		return errors.New("не удалось получить статус бота")
+		return fmt.Errorf("%w: %v", ErrBotStatusUnavailable, err)
 	}
 
 	if member.Role != telebot.Administrator {
-		log.Printf("[WARN] Бот не является админом в чате %d (роль: %s)", chat.ID, member.Role)
-		c.Send(messages.BotIsNotAdmin)
-		return errors.New("Бот не админ")
+		return ErrBotNotAdmin
 	}
 
 	return nil
-
 }

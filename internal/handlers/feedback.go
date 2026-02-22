@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -87,11 +86,9 @@ func (fh *FeedbackHandlers) HandelCancelFeedback(c telebot.Context) error {
 
 	fh.FeedbackManager.CancelFeedback(userID)
 
-	if err := c.Respond(&telebot.CallbackResponse{
+	_ = c.Respond(&telebot.CallbackResponse{
 		Text: "Отзыв отменён.",
-	}); err != nil {
-		log.Println("[ERROR] Не удалось отправить callback response:", err)
-	}
+	})
 
 	return c.Edit("Отправка отзыва отменена.")
 }
@@ -110,23 +107,16 @@ func (fh *FeedbackHandlers) HandelFeedbackText(c telebot.Context) error {
 	fh.FeedbackManager.CancelFeedback(userID)
 
 	// Ответ юзеру с боагодарностью за feedback
-	if err := c.Send(messages.ThanksFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}); err != nil {
-		log.Println("[ERROR] Проблема с отравкой ообщения после отзыва:", err)
-	}
+	_ = c.Send(messages.ThanksFeedbackMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 
 	msg := strings.TrimSpace(c.Text())
 	if msg != "" {
-		if err := fh.feedbackRepo.Create(ctx, userID, c.Sender().Username, c.Sender().FirstName, msg); err != nil {
-			log.Printf("[FEEDBACK][WARN] save failed: user=%d err=%v", userID, err)
-		}
+		_ = fh.feedbackRepo.Create(ctx, userID, c.Sender().Username, c.Sender().FirstName, msg)
 	}
 
 	for _, adminID := range fh.AdminsID {
 		adminMsg := fmt.Sprintf("📬 Новый отзыв от @%s (%d):\n\n%s", c.Sender().Username, userID, msg)
-		log.Println("[INFO]" + adminMsg)
-		if _, err := fh.Bot.Send(&telebot.User{ID: adminID}, adminMsg); err != nil {
-			log.Println("[ERROR] Проблема с отравкой ообщения после отзыва:", err)
-		}
+		_, _ = fh.Bot.Send(&telebot.User{ID: adminID}, adminMsg)
 	}
 
 	return nil

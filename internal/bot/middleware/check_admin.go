@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/game"
@@ -56,13 +56,19 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 	return func(next telebot.HandlerFunc) telebot.HandlerFunc {
 		return func(c telebot.Context) error {
 
+			chat := c.Chat()
+			user := c.Sender()
+
+			log := slog.Default().With(
+				"chat_id", chat.ID,
+				"user_id", user.ID,
+				"action", "only_host",
+			)
+
 			var (
 				isHost   bool
 				hostName string
 			)
-
-			chat := c.Chat()
-			user := c.Sender()
 
 			// Пропускаем приватные чаты
 			if chat.Type == telebot.ChatPrivate {
@@ -76,7 +82,9 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 			})
 
 			if err != nil {
-				log.Printf("[INFO] Попытка запуска раунда без начала новой игры в чате %d", chat.ID)
+
+				log.Debug("rejected: game not started but try to start", "err", err)
+
 				if c.Callback() != nil {
 					_ = c.Respond(&telebot.CallbackResponse{
 						Text: messages.GameNotStarted,
@@ -90,7 +98,9 @@ func OnlyHost(gm *game.GameManager) func(next telebot.HandlerFunc) telebot.Handl
 				return next(c)
 			}
 
-			text := fmt.Sprintf(messages.OnlyHostRules, hostName)
+			log.Debug("rejected: not a host")
+
+			text := fmt.Sprintf(messages.OnlyHostRulesWithName, hostName)
 
 			if c.Callback() != nil {
 				_ = c.Respond(&telebot.CallbackResponse{

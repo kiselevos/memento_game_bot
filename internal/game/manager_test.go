@@ -2,289 +2,338 @@ package game
 
 import (
 	"context"
+	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
+
+	"github.com/kiselevos/memento_game_bot/internal/models"
 )
 
-const (
-	chatID = int64(888)
-)
+// --- fakes ---
 
-func newTestGameManager() *GameManager {
-	return NewGameManager(NoopStatsRecorder{}, NoopTaskStore{})
+type fakeStats struct {
+	createSessionID int64
+	firstGame       bool
+
+	createSessionCalls int64
+
+	finishSessionCalls int64
+	finishedChatID     int64
+
+	statsForStartNewGameCalls int64
+	statsForStartNewGameUser  User
+
+	incrementTaskUsageCalls int64
+	incrementArgs           struct {
+		taskID     int64
+		countPhoto int64
+	}
+
+	usersVotesUpdateCalls int64
 }
 
-func seedSession(t *testing.T, gm *GameManager, id int64) {
+func (s *fakeStats) IncrementTaskUsage(ctx context.Context, taskID, countPhoto int64) {
+	atomic.AddInt64(&s.incrementTaskUsageCalls, 1)
+	s.incrementArgs.taskID = taskID
+	s.incrementArgs.countPhoto = countPhoto
+}
+
+func (s *fakeStats) StatsForStartNewGame(ctx context.Context, user User, sessionID int64) {
+	atomic.AddInt64(&s.statsForStartNewGameCalls, 1)
+	s.statsForStartNewGameUser = user
+}
+
+func (s *fakeStats) UsersVotesStatsUpdate(ctx context.Context, scores []PlayerScore, usersIDs []int64) {
+	atomic.AddInt64(&s.usersVotesUpdateCalls, 1)
+}
+
+func (s *fakeStats) CreateSessionRecord(ctx context.Context, chatID int64) int64 {
+	atomic.AddInt64(&s.createSessionCalls, 1)
+	return s.createSessionID
+}
+
+func (s *fakeStats) FinishSessionRecord(ctx context.Context, chatID int64) {
+	atomic.AddInt64(&s.finishSessionCalls, 1)
+	atomic.StoreInt64(&s.finishedChatID, chatID)
+}
+
+func (s *fakeStats) IsFirstGame(ctx context.Context, chatID int64) bool {
+	return s.firstGame
+}
+
+type fakeTaskStore struct {
+	tasks []models.Task
+	err   error
+}
+
+func (ts *fakeTaskStore) GetActiveTaskList(ctx context.Context, category *string) ([]models.Task, error) {
+	if ts.err != nil {
+		return nil, ts.err
+	}
+	out := make([]models.Task, len(ts.tasks))
+	copy(out, ts.tasks)
+	return out, nil
+}
+
+// --- helpers ---
+
+func mustStartSession(t *testing.T, gm *GameManager, chatID int64, host User) {
 	t.Helper()
-	if err := gm.StartNewGameSession(context.Background(), id, User{ID: 1}); err != nil {
-		t.Fatalf("StartNewGameSession error: %v", err)
-	}
-}
-
-func seedRoundWithOnePhoto(t *testing.T, gm *GameManager, id int64) {
-	t.Helper()
-
-	err := gm.DoWithSession(id, func(s *GameSession) error {
-		// запускаем раунд через доменный метод (правильно создаст UsersPhoto)
-		_, _, _, err := s.StartNewRound()
-		if err != nil {
-			return err
-		}
-
-		// добавляем фото
-		u := &User{ID: 42, FirstName: "Tester"}
-		s.TakePhoto(u, "photo_file_id_1")
-
-		return nil
-	})
+	_, err := gm.StartNewGameSession(chatID, host)
 	if err != nil {
-		t.Fatalf("seedRoundWithOnePhoto error: %v", err)
+		t.Fatalf("StartNewGameSession() error: %v", err)
 	}
 }
 
-func TestDoWithSession_NoSession(t *testing.T) {
-	gm := newTestGameManager()
+// --- tests ---
 
-	err := gm.DoWithSession(chatID, func(s *GameSession) error { return nil })
-	if err != ErrNoSession {
-		t.Fatalf("expected ErrNoSession, got %v", err)
-	}
-}
+func TestGameManager_Do_CreatesSingleActorPerChat(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
 
-func TestStartNewGameSession_CreatesSession(t *testing.T) {
-	gm := newTestGameManager()
-	seedSession(t, gm, chatID)
+	var a1, a2 *chatActor
 
-	var (
-		gotChatID int64
-		state     State
-	)
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
-		gotChatID = s.ChatID
-		state = s.FSM.Current()
+	if err := gm.Do(100, func(a *chatActor) error {
+		a1 = a
 		return nil
-	})
-	if err != nil {
-		t.Fatalf("DoWithSession error: %v", err)
-	}
-	if gotChatID != chatID {
-		t.Fatalf("expected ChatID %d, got %d", chatID, gotChatID)
-	}
-	if state != WaitingState {
-		t.Fatalf("expected initial state %s, got %s", WaitingState, state)
-	}
-}
-
-func TestEndGame_RemovesSession(t *testing.T) {
-	gm := newTestGameManager()
-	seedSession(t, gm, chatID)
-
-	if err := gm.EndGame(context.Background(), chatID); err != nil {
-		t.Fatalf("EndGame error: %v", err)
+	}); err != nil {
+		t.Fatalf("Do #1 error: %v", err)
 	}
 
-	err := gm.DoWithSession(chatID, func(s *GameSession) error { return nil })
-	if err != ErrNoSession {
-		t.Fatalf("expected ErrNoSession after EndGame, got %v", err)
+	if err := gm.Do(100, func(a *chatActor) error {
+		a2 = a
+		return nil
+	}); err != nil {
+		t.Fatalf("Do #2 error: %v", err)
+	}
+
+	if a1 == nil || a2 == nil {
+		t.Fatalf("actors are nil: a1=%v a2=%v", a1, a2)
+	}
+	if a1 != a2 {
+		t.Fatalf("expected same actor pointer for same chatID")
 	}
 }
 
-func TestConcurrentAccess_StartAndReadSessions(t *testing.T) {
-	gm := newTestGameManager()
+func TestGameManager_Do_SerializesConcurrentCalls(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
 
-	const N = 100
+	const N = 300
+	var counter int // без локов - если очередь сломана, тест часто флапает
+
 	var wg sync.WaitGroup
 	wg.Add(N)
 
 	for i := 0; i < N; i++ {
-		go func(id int64) {
+		go func() {
 			defer wg.Done()
-
-			if err := gm.StartNewGameSession(context.Background(), id, User{ID: 1}); err != nil {
-				t.Errorf("StartNewGameSession(%d) error: %v", id, err)
-				return
-			}
-
-			var got int64
-			err := gm.DoWithSession(id, func(s *GameSession) error {
-				got = s.ChatID
+			_ = gm.Do(777, func(a *chatActor) error {
+				counter++
 				return nil
 			})
-			if err != nil {
-				t.Errorf("DoWithSession(%d) error: %v", id, err)
-				return
-			}
-			if got != id {
-				t.Errorf("expected ChatID %d, got %d", id, got)
-			}
-		}(int64(i + 1000))
+		}()
 	}
 
 	wg.Wait()
-}
 
-func TestStartVoting_Success(t *testing.T) {
-	gm := newTestGameManager()
-	seedSession(t, gm, chatID)
-	seedRoundWithOnePhoto(t, gm, chatID)
-
-	photos, err := gm.StartVoting(chatID)
-	if err != nil {
-		t.Fatalf("StartVoting error: %v", err)
-	}
-	if len(photos) != 1 {
-		t.Fatalf("expected 1 photo item, got %d", len(photos))
-	}
-	if photos[0].Num != 1 {
-		t.Fatalf("expected photo Num=1, got %d", photos[0].Num)
-	}
-	if photos[0].PhotoID != "photo_file_id_1" {
-		t.Fatalf("unexpected PhotoID: %s", photos[0].PhotoID)
-	}
-
-	var (
-		state    State
-		votesLen int
-		indexLen int
-	)
-	err = gm.DoWithSession(chatID, func(s *GameSession) error {
-		state = s.FSM.Current()
-		votesLen = len(s.Votes)
-		indexLen = len(s.IndexPhotoToUser)
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("DoWithSession error: %v", err)
-	}
-	if state != VoteState {
-		t.Fatalf("expected FSM %s, got %s", VoteState, state)
-	}
-	if votesLen != 0 {
-		t.Fatalf("expected empty Votes at start, got %d", votesLen)
-	}
-	if indexLen != 1 {
-		t.Fatalf("expected IndexPhotoToUser size 1, got %d", indexLen)
+	if counter != N {
+		t.Fatalf("counter=%d, want %d (queue/actor serialization broken?)", counter, N)
 	}
 }
 
-func TestStartVoting_FailsOnInvalidFSMState(t *testing.T) {
-	gm := newTestGameManager()
-	seedSession(t, gm, chatID)
-	seedRoundWithOnePhoto(t, gm, chatID)
+func TestGameManager_DoWithSession_NoSession(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
 
-	// специально ломаем state: фото есть, но state = waiting
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
-		s.FSM.ForceState(WaitingState)
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("ForceState error: %v", err)
-	}
-
-	_, err = gm.StartVoting(chatID)
-	if err != ErrFSMState {
-		t.Fatalf("expected ErrFSMState, got %v", err)
+	err := gm.DoWithSession(1, func(s *GameSession) error { return nil })
+	if !errors.Is(err, ErrNoSession) {
+		t.Fatalf("expected ErrNoSession, got %v", err)
 	}
 }
 
-func TestFinishVoting_MovesToWaiting(t *testing.T) {
-	gm := newTestGameManager()
-	seedSession(t, gm, chatID)
-	seedRoundWithOnePhoto(t, gm, chatID)
+func TestGameManager_StartNewGameSession_CreatesSessionAndHostName(t *testing.T) {
+	stats := &fakeStats{createSessionID: 42}
+	ts := &fakeTaskStore{
+		tasks: []models.Task{
+			{ID: 1, Text: "Task 1"},
+			{ID: 2, Text: "Task 2"},
+		},
+	}
+	gm := NewGameManager(context.Background(), stats, ts)
 
-	_, err := gm.StartVoting(chatID)
+	host := User{ID: 10, FirstName: "Victoria", Username: "vic"}
+	fallbackUsed, err := gm.StartNewGameSession(999, host)
 	if err != nil {
-		t.Fatalf("StartVoting error: %v", err)
+		t.Fatalf("StartNewGameSession() error: %v", err)
+	}
+	if fallbackUsed {
+		t.Fatalf("fallbackUsed=true, want false")
 	}
 
-	if _, err := gm.FinishVoting(context.Background(), chatID); err != nil {
-		t.Fatalf("FinishVoting error: %v", err)
-	}
-
-	var state State
-	err = gm.DoWithSession(chatID, func(s *GameSession) error {
-		state = s.FSM.Current()
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("DoWithSession error: %v", err)
-	}
-	if state != WaitingState {
-		t.Fatalf("expected FSM %s, got %s", WaitingState, state)
-	}
-}
-
-func TestRegisterVote_SuccessAndBlocksDoubleVoteAndSelfVote(t *testing.T) {
-	gm := newTestGameManager()
-	seedSession(t, gm, chatID)
-	seedRoundWithOnePhoto(t, gm, chatID)
-
-	_, err := gm.StartVoting(chatID)
-	if err != nil {
-		t.Fatalf("StartVoting error: %v", err)
-	}
-
-	voter := &User{ID: 7, FirstName: "Voter"}
-
-	// голосуем за фото №1 (это user 42)
-	res, err := gm.RegisterVote(chatID, voter, 1)
-	if err != nil {
-		t.Fatalf("RegisterVote error: %v", err)
-	}
-	if res.IsCallback {
-		t.Fatalf("expected non-callback message on success, got callback: %+v", res)
-	}
-
-	// повторный голос — должен быть callback
-	res, err = gm.RegisterVote(chatID, voter, 1)
-	if err != nil {
-		t.Fatalf("RegisterVote error: %v", err)
-	}
-	if !res.IsCallback {
-		t.Fatalf("expected callback on double vote, got: %+v", res)
-	}
-
-	// self-vote: нужно чтобы voter был в IndexPhotoToUser. Сделаем второй раунд, добавим фото от voter.
-	err = gm.DoWithSession(chatID, func(s *GameSession) error {
-		_, _, _, e := s.StartNewRound()
-		if e != nil {
-			return e
+	err = gm.DoWithSession(999, func(s *GameSession) error {
+		if s.SessionID != 42 {
+			t.Fatalf("SessionID=%d, want 42", s.SessionID)
 		}
-		s.TakePhoto(voter, "photo_file_id_self")
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("seed self photo error: %v", err)
-	}
+		if s.ChatID != 999 {
+			t.Fatalf("ChatID=%d, want 999", s.ChatID)
+		}
+		if s.Host.ID != host.ID {
+			t.Fatalf("Host.ID=%d, want %d", s.Host.ID, host.ID)
+		}
+		if s.FSM == nil || s.FSM.Current() != WaitingState {
+			t.Fatalf("FSM invalid or not in WaitingState")
+		}
+		if s.UserNames == nil {
+			t.Fatalf("UserNames is nil")
+		}
 
-	_, err = gm.StartVoting(chatID)
-	if err != nil {
-		t.Fatalf("StartVoting error: %v", err)
-	}
-
-	// найдём номер фото voter'а
-	var selfNum int
-	err = gm.DoWithSession(chatID, func(s *GameSession) error {
-		for num, uid := range s.IndexPhotoToUser {
-			if uid == voter.ID {
-				selfNum = num
-				break
-			}
+		if len(s.Tasks) == 0 {
+			t.Fatalf("Tasks not initialized")
 		}
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("find self num error: %v", err)
-	}
-	if selfNum == 0 {
-		t.Fatalf("expected to find self photo num")
+		t.Fatalf("DoWithSession() error: %v", err)
 	}
 
-	res, err = gm.RegisterVote(chatID, voter, selfNum)
-	if err != nil {
-		t.Fatalf("RegisterVote error: %v", err)
+	if got := atomic.LoadInt64(&stats.createSessionCalls); got != 1 {
+		t.Fatalf("CreateSessionRecord calls=%d, want 1", got)
 	}
-	if !res.IsCallback {
-		t.Fatalf("expected callback on self-vote, got: %+v", res)
+}
+
+func TestGameManager_CheckFirstGame(t *testing.T) {
+	stats := &fakeStats{firstGame: true}
+	gm := NewGameManager(context.Background(), stats, &fakeTaskStore{})
+
+	if !gm.CheckFirstGame(1) {
+		t.Fatalf("expected true")
+	}
+}
+
+func TestGameManager_StartNewRound_NoSession(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+
+	_, _, err := gm.StartNewRound(111, 808080)
+	if !errors.Is(err, ErrNoSession) {
+		t.Fatalf("expected ErrNoSession, got %v", err)
+	}
+}
+
+func TestGameManager_SubmitPhoto_RoundNotActive(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+	host := User{ID: 1, FirstName: "Host"}
+	mustStartSession(t, gm, 123, host)
+
+	_ = gm.DoWithSession(123, func(s *GameSession) error {
+		// чтобы не сработал invariant
+		if s.UsersPhoto == nil {
+			s.UsersPhoto = make(map[int64]string)
+		}
+		s.FSM.ForceState(WaitingState) // round не активен
+		return nil
+	})
+
+	_, _, err := gm.SubmitPhoto(123, &User{ID: 2, FirstName: "U"}, "file-1")
+	if !errors.Is(err, ErrRoundNotActive) {
+		t.Fatalf("expected ErrRoundNotActive, got %v", err)
+	}
+}
+
+func TestGameManager_SubmitPhoto_InvariantUsersPhotoNil(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+	host := User{ID: 1, FirstName: "Host"}
+	mustStartSession(t, gm, 555, host)
+
+	_ = gm.DoWithSession(555, func(s *GameSession) error {
+		s.UsersPhoto = nil // ломаем инвариант
+		s.FSM.ForceState(RoundStartState)
+		return nil
+	})
+
+	_, _, err := gm.SubmitPhoto(555, &User{ID: 2, FirstName: "U"}, "file-1")
+	if !errors.Is(err, ErrInvariantViolation) {
+		t.Fatalf("expected ErrInvariantViolation, got %v", err)
+	}
+}
+
+func TestGameManager_SubmitPhoto_NewUser_UpdatesStatsOnce(t *testing.T) {
+	stats := &fakeStats{createSessionID: 1}
+	gm := NewGameManager(context.Background(), stats, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+	host := User{ID: 1, FirstName: "Host"}
+	mustStartSession(t, gm, 777, host)
+
+	_ = gm.DoWithSession(777, func(s *GameSession) error {
+		if s.UsersPhoto == nil {
+			s.UsersPhoto = make(map[int64]string)
+		}
+		s.FSM.ForceState(RoundStartState)
+		return nil
+	})
+
+	u := &User{ID: 2, FirstName: "Alice"}
+
+	_, _, err := gm.SubmitPhoto(777, u, "file-1")
+	if err != nil {
+		t.Fatalf("SubmitPhoto() error: %v", err)
+	}
+
+	if got := atomic.LoadInt64(&stats.statsForStartNewGameCalls); got != 1 {
+		t.Fatalf("StatsForStartNewGame calls=%d, want 1", got)
+	}
+	if stats.statsForStartNewGameUser.ID != u.ID {
+		t.Fatalf("StatsForStartNewGame userID=%d, want %d", stats.statsForStartNewGameUser.ID, u.ID)
+	}
+}
+
+func TestGameManager_RegisterVote_NoSession_ReturnsCallbackErrorResult(t *testing.T) {
+	gm := NewGameManager(context.Background(), &fakeStats{createSessionID: 1}, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+
+	res, err := gm.RegisterVote(999, &User{ID: 1, FirstName: "V"}, 1)
+	if err != nil {
+		t.Fatalf("expected err=nil, got %v", err)
+	}
+	if res == nil {
+		t.Fatalf("expected non-nil VoteResult")
+	}
+	if !res.IsCallback || !res.IsError {
+		t.Fatalf("expected callback+error result, got %+v", *res)
+	}
+}
+
+func TestGameManager_EndGame_NoSession(t *testing.T) {
+	stats := &fakeStats{createSessionID: 1}
+	gm := NewGameManager(context.Background(), stats, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+
+	err := gm.EndGame(1, 808080)
+	if !errors.Is(err, ErrNoSession) {
+		t.Fatalf("expected ErrNoSession, got %v", err)
+	}
+	if got := atomic.LoadInt64(&stats.finishSessionCalls); got != 0 {
+		t.Fatalf("FinishSessionRecord calls=%d, want 0", got)
+	}
+}
+
+func TestGameManager_EndGame_ClearsSession_AndWritesStats(t *testing.T) {
+	stats := &fakeStats{createSessionID: 900}
+	gm := NewGameManager(context.Background(), stats, &fakeTaskStore{tasks: []models.Task{{ID: 1, Text: "t"}}})
+
+	host := User{ID: 1, FirstName: "Host"}
+	mustStartSession(t, gm, 900, host)
+
+	err := gm.EndGame(900, host.ID)
+	if err != nil {
+		t.Fatalf("EndGame error: %v", err)
+	}
+
+	// session cleared
+	err = gm.DoWithSession(900, func(s *GameSession) error { return nil })
+	if !errors.Is(err, ErrNoSession) {
+		t.Fatalf("expected ErrNoSession after EndGame, got %v", err)
+	}
+
+	if got := atomic.LoadInt64(&stats.finishSessionCalls); got != 1 {
+		t.Fatalf("FinishSessionRecord calls=%d, want 1", got)
+	}
+	if got := atomic.LoadInt64(&stats.finishedChatID); got != 900 {
+		t.Fatalf("FinishSessionRecord chatID=%d, want 900", got)
 	}
 }

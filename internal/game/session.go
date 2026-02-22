@@ -53,7 +53,7 @@ func (s *GameSession) GetUserName(userID int64) string {
 	if name, ok := s.UserNames[userID]; ok {
 		return name
 	}
-	return "Анонимный Осётр"
+	return messages.UnnownPerson
 }
 
 func (s *GameSession) TotalScore() []PlayerScore {
@@ -66,6 +66,15 @@ func (s *GameSession) RoundScore() []PlayerScore {
 		voteCount[votedFor]++
 	}
 	return s.scoreFromMap(voteCount)
+}
+
+// Возвращаем ID участников раунда для статистики
+func (s *GameSession) GetPlayersIDs() []int64 {
+	ids := make([]int64, 0, len(s.UsersPhoto))
+	for id := range s.UsersPhoto {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 func (s *GameSession) scoreFromMap(data map[int64]int) []PlayerScore {
@@ -106,8 +115,8 @@ func (s *GameSession) StartNewRound() (prevTaskID int64, countPhoto int, task mo
 
 	newTask := models.Task{}
 
-	if !SafeTrigger(s.FSM, EventStartRound, "GameSession.StartNewRound") {
-		return prevTaskID, 0, newTask, ErrFSMState
+	if err := s.FSM.Trigger(EventStartRound); err != nil {
+		return prevTaskID, 0, newTask, fmt.Errorf("start new round: %w", err)
 	}
 
 	s.CarrentTask, err = s.NextTask()
@@ -138,8 +147,8 @@ func (s *GameSession) StartVoting() ([]VotePhoto, error) {
 		return nil, ErrNoPhotosToVote
 	}
 
-	if !SafeTrigger(s.FSM, EventStartVote, "GameSession.StartVoting") {
-		return nil, ErrFSMState
+	if err := s.FSM.Trigger(EventStartVote); err != nil {
+		return nil, fmt.Errorf("start voting: %w", err)
 	}
 
 	items := make([]VotePhoto, 0, len(s.UsersPhoto))
@@ -179,17 +188,14 @@ func (s *GameSession) RegisterVote(voter *User, photoNum int) (bool, string, err
 	s.Votes[voter.ID] = targetUserID
 	s.Score[targetUserID]++
 
-	if _, ok := s.UserNames[voter.ID]; !ok {
-		s.UserNames[voter.ID] = DisplayNameHTML(voter)
-	}
-
 	return true, fmt.Sprintf("%s проголосовал(а)", s.GetUserName(voter.ID)), nil
 }
 
 func (s *GameSession) FinishVoting() error {
-	if !SafeTrigger(s.FSM, EventFinishVote, "GameSession.FinishVoting") {
-		return ErrFSMState
+	if err := s.FSM.Trigger(EventFinishVote); err != nil {
+		return fmt.Errorf("finish voting: %w", err)
 	}
+
 	// Считаем завершенные раунды.
 	s.CountRounds++
 	return nil

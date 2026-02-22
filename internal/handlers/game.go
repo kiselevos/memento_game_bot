@@ -1,16 +1,16 @@
 package handlers
 
 import (
-	"context"
+	"errors"
 	"fmt"
-	"log"
-	"time"
+	"log/slog"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/bot"
 	"github.com/kiselevos/memento_game_bot/internal/bot/middleware"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
 	"github.com/kiselevos/memento_game_bot/internal/game"
+	"github.com/kiselevos/memento_game_bot/internal/logging"
 
 	"gopkg.in/telebot.v3"
 )
@@ -76,18 +76,24 @@ func (gh *GameHandlers) Start(c telebot.Context) error {
 // StartGame - работает из любого места, начинает новую сессию, заканчивая старую
 func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	if c.Callback() != nil {
-		if err := c.Respond(); err != nil {
-			log.Printf("[WARN] Respond error: %v", err)
-		}
+		_ = c.Respond()
 	}
 
 	if err := middleware.CheckBotAdminRights(c, gh.BotInfo, gh.Bot); err != nil {
-		log.Println("[ERROR] Запуск игры без прав админа", err)
-		return err
+		switch {
+		case errors.Is(err, middleware.ErrBotNotAdmin):
+			_ = c.Send(messages.BotIsNotAdmin)
+			return nil
+
+		case errors.Is(err, middleware.ErrBotStatusUnavailable):
+			_ = c.Send(messages.ErrorMessagesForUser)
+			return err
+
+		default:
+			_ = c.Send(messages.ErrorMessagesForUser)
+			return err
+		}
 	}
 
 	chatID := c.Chat().ID
@@ -100,7 +106,7 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 	})
 
 	if err != nil {
-		if gh.GameManager.CheckFirstGame(ctx, chatID) {
+		if gh.GameManager.CheckFirstGame(chatID) {
 			if gh.Bot != nil {
 				gh.Bot.Send(&telebot.Chat{ID: chatID}, messages.WelcomeGroupMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 				bot.WaitingAnimation(c, gh.Bot, 5)
@@ -112,7 +118,15 @@ func (gh *GameHandlers) StartGame(c telebot.Context) error {
 
 		text := fmt.Sprintf(messages.GameStartedWithHost, game.DisplayNameHTML(&user))
 
-		gh.GameManager.StartNewGameSession(ctx, chatID, user)
+		fallbackUsed, err := gh.GameManager.StartNewGameSession(chatID, user)
+		if err != nil {
+			_ = c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+			return err
+		}
+
+		if fallbackUsed {
+			gh.notifyDBFallback(chatID, user.ID, "start_game")
+		}
 
 		return c.Send(text, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
@@ -133,15 +147,17 @@ func (gh *GameHandlers) ConfirmNewGame(c telebot.Context) error {
 		_ = c.Respond(&telebot.CallbackResponse{Text: messages.RestartGameMsg})
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	chatID := c.Chat().ID
 	user := game.GetUserFromTelebot(c.Sender())
 
-	if err := gh.GameManager.StartNewGameSession(ctx, chatID, user); err != nil {
-		log.Printf("[ERROR] StartNewGameSession: %v", err)
-		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+	fallbackUsed, err := gh.GameManager.StartNewGameSession(chatID, user)
+	if err != nil {
+		_ = c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+		return err // OnError -> Notify
+	}
+
+	if fallbackUsed {
+		gh.notifyDBFallback(chatID, user.ID, "start_game")
 	}
 
 	markup := &telebot.ReplyMarkup{}
@@ -165,9 +181,6 @@ func (gh *GameHandlers) CancelRestart(c telebot.Context) error {
 func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 	chatID := c.Chat().ID
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{gh.StartGameBtn}}
 
@@ -181,10 +194,32 @@ func (gh *GameHandlers) HandleEndGame(c telebot.Context) error {
 
 	result := bot.RenderScore(bot.FinalScore, totalScore)
 
-	err = gh.GameManager.EndGame(ctx, chatID)
+	err = gh.GameManager.EndGame(chatID, c.Sender().ID)
 	if err != nil {
-		log.Println("[ERROR] Проблема с обнулением session в actors", err)
+		switch {
+		case errors.Is(err, game.ErrNoSession):
+			return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+
+		default:
+			_ = c.Send(result+"\n"+messages.FinishGameMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+			return err
+		}
 	}
 
 	return c.Send(result+"\n"+messages.FinishGameMessage, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+}
+
+// Helper для логировани
+func (gh *GameHandlers) notifyDBFallback(chatID int64, userID int64, action string) {
+	slog.Default().Error("database unavailable, fallback tasks used",
+		"chat_id", chatID,
+		"user_id", userID,
+		"action", action,
+	)
+
+	logging.Notify(slog.LevelError, "database unavailable, fallback tasks used",
+		"chat_id", chatID,
+		"user_id", userID,
+		"action", action,
+	)
 }

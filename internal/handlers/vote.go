@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"context"
+	"errors"
 	"fmt"
-	"log"
 	"strconv"
-	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/bot"
@@ -65,17 +63,31 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 
-	photos, err := vh.GameManager.StartVoting(chatID)
+	photos, err := vh.GameManager.StartVoting(chatID, c.Sender().ID)
 	if err != nil {
-		switch err {
-		case game.ErrNoSession:
+		switch {
+		case errors.Is(err, game.ErrNoSession):
 			return c.Send(messages.GameNotStarted)
-		case game.ErrNoPhotosToVote:
+
+		case errors.Is(err, game.ErrNoPhotosToVote):
 			return c.Send(messages.NotEnoughPhoto, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
-		case game.ErrFSMState:
-			return c.Send("На данный момент нет запущенного раунда")
+
+		case errors.Is(err, game.ErrWrongState):
+			return c.Send(messages.RoundNotActive)
+
+		case errors.Is(err, game.ErrOnlyHost):
+			text := fmt.Sprintf(messages.OnlyHostRules)
+			if c.Callback() != nil {
+				_ = c.Respond(&telebot.CallbackResponse{
+					Text: text,
+				})
+				return nil
+			}
+			return c.Reply(text)
+
 		default:
-			return c.Send(messages.ErrorMessagesForUser)
+			_ = c.Send(messages.ErrorMessagesForUser)
+			return err
 		}
 	}
 
@@ -84,12 +96,13 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 		messages.VotingStartedMessage,
 		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
 	)
+
 	if err != nil {
-		log.Printf("[WARN] cannot send VotingStartedMessage: %v", err)
-	} else if msg != nil {
-		if e := vh.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
-			log.Printf("[WARN] cannot save system msg id: %v", e)
-		}
+		return err
+	}
+
+	if msg != nil {
+		vh.GameManager.SaveSystemMsgID(chatID, msg.ID)
 	}
 
 	for _, p := range photos {
@@ -111,9 +124,9 @@ func (vh *VoteHandlers) StartVote(c telebot.Context) error {
 			)
 
 			if err != nil {
-				log.Printf("[WARN] cannot send vote photo: %v", err)
-				continue
+				return err
 			}
+
 			if msg != nil {
 				// сохраняем msg.ID в session
 				_ = vh.GameManager.SaveVotePhotoMsgID(chatID, p.Num, msg.ID)
@@ -172,14 +185,11 @@ func (vh *VoteHandlers) HandleVoteCallback(c telebot.Context) error {
 		&telebot.SendOptions{ParseMode: telebot.ModeHTML},
 	)
 	if err != nil {
-		log.Printf("[WARN] cannot send vote public msg: %v", err)
-		return nil
+		return err
 	}
 
 	if msg != nil {
-		if e := vh.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
-			log.Printf("[WARN] cannot save system msg id (vote msg): %v", e)
-		}
+		vh.GameManager.SaveSystemMsgID(chatID, msg.ID)
 	}
 	return nil
 }
@@ -192,19 +202,28 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// 1) Завершаем голосование (FSM transition) внутри actor
-	scores, err := vh.GameManager.FinishVoting(ctx, chatID)
+	scores, err := vh.GameManager.FinishVoting(chatID, c.Sender().ID)
 	if err != nil {
-		switch err {
-		case game.ErrNoSession:
+		switch {
+		case errors.Is(err, game.ErrNoSession):
 			return c.Send(messages.GameNotStarted)
-		case game.ErrFSMState:
-			return c.Send("Сейчас голосование не активно.")
+
+		case errors.Is(err, game.ErrWrongState):
+			return c.Send(messages.VotedNotActive)
+
+		case errors.Is(err, game.ErrOnlyHost):
+			text := fmt.Sprintf(messages.OnlyHostRules)
+			if c.Callback() != nil {
+				_ = c.Respond(&telebot.CallbackResponse{
+					Text: text,
+				})
+				return nil
+			}
+			return c.Reply(text)
+
 		default:
-			return c.Send(messages.ErrorMessagesForUser)
+			_ = c.Send(messages.ErrorMessagesForUser)
+			return err
 		}
 	}
 
@@ -212,8 +231,6 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 	cleanID, err := vh.GameManager.PopMsgIDs(chatID)
 	if err == nil {
 		vh.cleanupRoundArtifacts(chatID, cleanID)
-	} else {
-		log.Printf("[CLEANUP][WARN] PopMsgIDs failed: chat=%d err=%v", chatID, err)
 	}
 
 	result := messages.EmptyVotedResult
@@ -233,44 +250,28 @@ func (vh *VoteHandlers) HandleFinishVote(c telebot.Context) error {
 
 func (vh *VoteHandlers) cleanupRoundArtifacts(chatID int64, cleanID game.CleanupIDs) {
 	if vh.Bot == nil {
-		log.Printf("[CLEANUP] bot is nil, skip")
 		return
 	}
 
 	empty := &telebot.ReplyMarkup{}
 
 	// 1) Убираем inline-кнопки с фото (EditReplyMarkup)
-	okEdits := 0
 	for _, id := range cleanID.VotePhotoMsgIDs {
 		m := &telebot.Message{
 			ID:   id,
 			Chat: &telebot.Chat{ID: chatID},
 		}
 
-		if _, err := vh.Bot.EditReplyMarkup(m, empty); err != nil {
-			log.Printf("[CLEANUP][WARN] EditReplyMarkup failed: chat=%d msg=%d err=%v", chatID, id, err)
-			continue
-		}
-		okEdits++
+		vh.Bot.EditReplyMarkup(m, empty)
 	}
 
 	// 2) Удаляем системные сообщения (Delete)
-	okDeletes := 0
 	for _, id := range cleanID.SystemMsgIDs {
 		m := &telebot.Message{
 			ID:   id,
 			Chat: &telebot.Chat{ID: chatID},
 		}
 
-		if err := vh.Bot.Delete(m); err != nil {
-			log.Printf("[CLEANUP][WARN] Delete failed: chat=%d msg=%d err=%v", chatID, id, err)
-			continue
-		}
-		okDeletes++
+		vh.Bot.Delete(m)
 	}
-
-	log.Printf(
-		"[CLEANUP] chat=%d votePhotoIDs=%d edited=%d systemIDs=%d deleted=%d",
-		chatID, len(cleanID.VotePhotoMsgIDs), okEdits, len(cleanID.SystemMsgIDs), okDeletes,
-	)
 }

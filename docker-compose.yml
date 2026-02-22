@@ -2,21 +2,17 @@ services:
   bot:
     build:
       context: .
-      dockerfile: Dockerfile
+      args:
+        APP_PATH: ./cmd/main
     container_name: memento_bot
     env_file:
       - .env
+    environment:
+      DB_HOST: postgres
     restart: unless-stopped
-    depends_on:
-      - bot-prepare
-    volumes:
-      - ./logs:/app/logs
-
-  # фиктивный сервис, для docker-compose при первом старте
-  bot-prepare:
-    image: busybox
-    command: /bin/true
+    networks:
+      - memento_network
 
 networks:
-  default:
-    name: memento_network
+  memento_network:
+    external: true

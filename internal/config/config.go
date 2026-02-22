@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -12,10 +12,11 @@ import (
 )
 
 type Config struct {
-	Db    DbConfig
-	TG    TgConfig
-	Admin AdminsConfig
-	Bot   BotConfig
+	Db     DbConfig
+	TG     TgConfig
+	Admin  AdminsConfig
+	Bot    BotConfig
+	Logger LogConfig
 }
 
 type DbConfig struct {
@@ -40,6 +41,40 @@ type BotConfig struct {
 	FeedbackTTL          time.Duration
 }
 
+type LogConfig struct {
+	Level  slog.Level
+	AppEnv string
+}
+
+// Logging
+func GetLogConfig() LogConfig {
+
+	appEnv := os.Getenv("APP_ENV")
+
+	if appEnv != "local" {
+		appEnv = "prod"
+	}
+
+	return LogConfig{
+		Level:  levelFromEnv(),
+		AppEnv: appEnv,
+	}
+}
+
+func levelFromEnv() slog.Level {
+	switch os.Getenv("LOG_LEVEL") {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// Bot
 func GetBotConfig() BotConfig {
 	return BotConfig{
 		DropOldMessagesAfter: envDuration("BOT_DROP_OLD_TIMEOUT", 10*time.Second),
@@ -47,18 +82,23 @@ func GetBotConfig() BotConfig {
 	}
 }
 
-func GetDbConfig() DbConfig {
+func GetDbConfig() (DbConfig, error) {
+	dsn, err := GetDsn()
+	if err != nil {
+		return DbConfig{}, err
+	}
+
 	return DbConfig{
-		Dsn:             GetDsn(),
+		Dsn:             dsn,
 		Delay:           envDuration("DB_DELAY_CONNECTION", 2*time.Second),
 		MaxAttempts:     envInt("DB_MAX_ATTEMPTS", 5),
 		MaxOpenConns:    envInt("DB_MAX_OPEN_CONN", 10),
 		MaxIdleConns:    envInt("DB_MAX_IDLE_CONN", 5),
 		ConnMaxLifetime: envDuration("DB_MAX_LIFETIME_CONN", 30*time.Minute),
-	}
+	}, nil
 }
 
-func GetDsn() string {
+func GetDsn() (string, error) {
 	env := os.Getenv("APP_ENV")
 
 	host := os.Getenv("DB_HOST")
@@ -75,53 +115,43 @@ func GetDsn() string {
 	name := os.Getenv("DB_NAME")
 
 	if user == "" || pass == "" || port == "" || name == "" {
-		log.Fatal("DB env is not set полностью: DB_USER, DB_PASSWORD, DB_PORT, DB_NAME are required")
+		return "", fmt.Errorf("db env is not set полностью: DB_USER, DB_PASSWORD, DB_PORT, DB_NAME are required")
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&TimeZone=UTC",
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable&TimeZone=UTC",
 		user, pass, host, port, name,
 	)
-
-	return dsn
+	return dsn, nil
 }
 
 func GetAdminConfig() AdminsConfig {
-
 	raw := os.Getenv("ADMINS_ID")
-	if raw == "" {
-		log.Println("ADMINS_ID is not set")
-		return AdminsConfig{
-			AdminsID: nil,
-		}
+	if strings.TrimSpace(raw) == "" {
+		return AdminsConfig{AdminsID: nil}
 	}
 
-	admins := strings.Split(raw, ",")
-	var adminsID []int64
+	parts := strings.Split(raw, ",")
+	adminsID := make([]int64, 0, len(parts))
 
-	for _, strID := range admins {
+	for _, strID := range parts {
 		strID = strings.TrimSpace(strID)
 		if strID == "" {
 			continue
 		}
 		id, err := strconv.ParseInt(strID, 10, 64)
 		if err != nil {
-			log.Printf("invalid admin ID '%s': %v", strID, err)
 			continue
 		}
 		adminsID = append(adminsID, id)
 	}
 
-	return AdminsConfig{
-		AdminsID: adminsID,
-	}
+	return AdminsConfig{AdminsID: adminsID}
 }
 
 func LoadConfig() (*Config, error) {
-
 	if os.Getenv("APP_ENV") != "docker" {
-		if err := godotenv.Load(); err != nil {
-			log.Println(".env file not found, using system environment variables")
-		}
+		_ = godotenv.Load() // тихо; отсутствие .env - норм
 	}
 
 	token := os.Getenv("TELEGRAM_TOKEN")
@@ -129,13 +159,17 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("TELEGRAM_TOKEN not set")
 	}
 
+	dbCfg, err := GetDbConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		TG: TgConfig{
-			Token: token,
-		},
-		Db:    GetDbConfig(),
-		Admin: GetAdminConfig(),
-		Bot:   GetBotConfig(),
+		TG:     TgConfig{Token: token},
+		Db:     dbCfg,
+		Admin:  GetAdminConfig(),
+		Bot:    GetBotConfig(),
+		Logger: GetLogConfig(),
 	}, nil
 }
 
@@ -146,30 +180,19 @@ func envDuration(key string, def time.Duration) time.Duration {
 		return def
 	}
 	d, err := time.ParseDuration(raw)
-	if err != nil {
-		log.Printf("invalid %s=%q: %v (using default %s)", key, raw, err, def)
-		return def
-	}
-	if d <= 0 {
-		log.Printf("invalid %s=%q: must be > 0 (using default %s)", key, raw, def)
+	if err != nil || d <= 0 {
 		return def
 	}
 	return d
 }
 
-// helper for int
 func envInt(key string, def int) int {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
 		return def
 	}
 	n, err := strconv.Atoi(raw)
-	if err != nil {
-		log.Printf("invalid %s=%q: %v (using default %d)", key, raw, err, def)
-		return def
-	}
-	if n <= 0 {
-		log.Printf("invalid %s=%q: must be > 0 (using default %d)", key, raw, def)
+	if err != nil || n <= 0 {
 		return def
 	}
 	return n

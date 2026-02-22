@@ -13,29 +13,33 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${DB_USER}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks:
+      - memento_network
 
   migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: memento_migrate
-    command: ["go", "run", "migrations/auto.go"]
-    env_file:
-      - .env
-    environment:
-      APP_ENV: docker
+    image: kukymbr/goose-docker:3.26.0
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./migrations:/migrations:ro
+    environment:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable"
+    command: ["-dir", "/migrations", "up"]
+    restart: "no"
+    networks:
+      - memento_network
 
-networks:
-  default:
-    name: memento_network
-
-# Избавляемя от локальных volume
 volumes:
   memento_pgdata:
+
+networks:
+  memento_network:
+    external: true

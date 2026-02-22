@@ -23,51 +23,89 @@ tidy: ## Обновление зависимостей проекта
 run: ## Запуск бота локально (Подключение к DB в docker)
 	@go run ./cmd/main.go
 
+DB_COMPOSE=docker-compose.db.yml
+BOT_COMPOSE=docker-compose.bot.yml
+
+.PHONY: network
+network: ## Создать общую docker сеть (если нет)
+	@docker network inspect memento_network >/dev/null 2>&1 || docker network create memento_network
+	@echo "🌐 Network ready"
+
+
+# ============================================================
+# DATABASE
+# ============================================================
+
 .PHONY: db-up
-db-up: ## Запуск PostgreSQL контейнера
-	@docker compose -f docker-compose.db.yml up -d postgres
-	@echo "✅ PostgreSQL created & run"
+db-up: network ## Запуск PostgreSQL + миграции
+	@docker compose -f $(DB_COMPOSE) up -d
+	@echo "✅ PostgreSQL + migrations started"
+
 
 .PHONY: db-stop
-db-stop: ## Остановка PostgreSQL контейнера без удаления данных
-	@docker compose -f docker-compose.db.yml stop postgres
+db-stop: ## Остановка PostgreSQL без удаления данных
+	@docker compose -f $(DB_COMPOSE) stop
 	@echo "⏸ PostgreSQL stopped"
 
 .PHONY: db-down
-db-down: ## Остановка и удаление PostgreSQL контейнера и данных
-	@docker compose -f docker-compose.db.yml down -v
-	@echo "🧹 PostgreSQL stopped & removed"
+db-down: ## Остановка и удаление PostgreSQL + данных
+	@docker compose -f $(DB_COMPOSE) down -v
+	@echo "🧹 PostgreSQL removed (data deleted)"
+
 
 .PHONY: migrate
-migrate: ## Запуск миграций в Docker
-	@docker compose -f docker-compose.db.yml run --rm migrate
-	@echo "✅ Migrate success"
-
-.PHONY: rebuild-migrate
-rebuild-migrate: ## Персборка образа для миграций
-	@docker compose -f docker-compose.db.yml build migrate
+migrate: ## Прогнать миграции вручную
+	@docker compose -f $(DB_COMPOSE) run --rm migrate
+	@echo "✅ Migrations applied"
 
 .PHONY: logs-db
-logs-db: ## Логи PostgreSQL контейнера
-	@docker logs -f memento_postgres
+logs-db: ## Логи Postgres
+	@docker compose -f $(DB_COMPOSE) logs -f postgres
 
-.PHONY: clean
-clean: ## Остановка и удаление всех Postgres контенеров, данных DB 
-	@docker compose -f docker-compose.db.yml down -v --remove-orphans
+
+# =========================
+# BOT
+# =========================
+
+.PHONY: bot-up
+bot-up: network ## Запуск бота в Docker
+	@docker compose -f $(BOT_COMPOSE) up -d --build
+	@echo "🤖 Bot started"
+
+.PHONY: bot-stop
+bot-stop: ## Остановка бота
+	@docker compose -f $(BOT_COMPOSE) stop
+	@echo "⏸ Bot stopped"
+
+.PHONY: bot-down
+bot-down: ## Удаление контейнера бота
+	@docker compose -f $(BOT_COMPOSE) down
+	@echo "🧹 Bot removed"
+
+.PHONY: logs-bot
+logs-bot: ## Логи бота
+	@docker compose -f $(BOT_COMPOSE) logs -f bot
+
+# =========================
+# FULL STACK
+# =========================
+
+.PHONY: up
+up: db-up bot-up ## Полный запуск (DB + Bot)
+	@echo "🚀 Full stack started"
+
+.PHONY: stop
+stop: bot-stop db-stop ## Остановить всё
+	@echo "🛑 Full stack stopped"
+
+.PHONY: down
+down: bot-down db-down ## Удалить всё (включая данные БД)
+	@echo "🧹 Full stack removed"
 
 .PHONY: ps
-ps: ## Показать запушенные контенеры Docker
-	@docker ps --filter "name=memento_postgres"
+ps: ## Показать контейнеры проекта
+	@docker ps --filter "network=memento_network"
 
-# ============================================================
-# 🧩 Combined Shortcuts
-# ============================================================
-
-.PHONY: setup
-setup: db-up migrate ## Поднятие базы и установка миграций
-
-.PHONY: restart
-restart: db-down db-up migrate ## Перезапуск DB и миграций
 
 # ============================================================
 # 🧪 Tests & Checks

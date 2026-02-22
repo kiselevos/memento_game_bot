@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"log"
-	"time"
+	"log/slog"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/bot/middleware"
@@ -45,35 +43,56 @@ func (rh *RoundHandlers) Register() {
 
 func (rh *RoundHandlers) HandleStartRound(c telebot.Context) error {
 
+	chatID := c.Chat().ID
+
+	log := slog.Default().With(
+		"chat_id", chatID,
+		"user_id", c.Sender().ID,
+		"action", "start_round",
+		"is_callback", c.Callback() != nil,
+	)
+
 	if c.Callback() != nil {
 		_ = c.Respond()
 
 		empty := &telebot.ReplyMarkup{}
 		if _, err := rh.Bot.EditReplyMarkup(c.Message(), empty); err != nil {
-			log.Printf("[WARN] cannot remove keyboard: %v", err)
+			log.Warn("cannot remove keyboard", "err", err)
 		}
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{{rh.GameHandlers.StartGameBtn}}
 
-	chatID := c.Chat().ID
-
-	round, task, err := rh.GameManager.StartNewRound(ctx, chatID)
+	round, task, err := rh.GameManager.StartNewRound(chatID, c.Sender().ID)
 	if err != nil {
-		if errors.Is(err, game.ErrNoSession) {
+		switch {
+		case errors.Is(err, game.ErrNoSession):
 			return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
-		}
-		if errors.Is(err, game.ErrNoTasksLeft) {
+
+		case errors.Is(err, game.ErrNoTasksLeft):
 			_ = c.Send(messages.TheEndMessages, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 			return rh.GameHandlers.HandleEndGame(c)
-		}
 
-		log.Printf("[ERROR] Ошибка начала нового раунда %d: %v", chatID, err)
-		return c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+		case errors.Is(err, game.ErrWrongState):
+			return c.Send(messages.RoundAlreadyStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+
+		case errors.Is(err, game.ErrOnlyHost):
+			text := fmt.Sprintf(messages.OnlyHostRules)
+			if c.Callback() != nil {
+				_ = c.Respond(&telebot.CallbackResponse{
+					Text: text,
+				})
+				return nil
+			}
+			return c.Reply(text)
+
+		default:
+			log.Error("failed to start new round", "err", err)
+			_ = c.Send(messages.ErrorMessagesForUser, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+
+			return err
+		}
 	}
 
 	roundMsg := fmt.Sprintf(messages.RoundStartedMessage, round)

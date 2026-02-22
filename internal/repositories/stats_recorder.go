@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/kiselevos/memento_game_bot/internal/game"
 )
@@ -23,63 +23,82 @@ func NewRecorder(ur *UserRepo, tr *TaskRepo, sr *SessionRepo) *Recorder {
 
 // Инкрементируем задания
 func (r *Recorder) IncrementTaskUsage(ctx context.Context, taskID, countPhoto int64) {
+	l := slog.Default().With("component", "recorder", "action", "increment_task_usage", "task_id", taskID)
 
 	if countPhoto > 0 {
 		if err := r.taskRepo.IncUse(ctx, taskID, countPhoto); err != nil {
-			log.Printf("[DB ERROR] add use_count task %d: %v", taskID, err)
+			l.Error("db update failed: inc use_count", "count_photo", countPhoto, "err", err)
 		}
 		return
 	}
+
 	if err := r.taskRepo.IncSkip(ctx, taskID); err != nil {
-		log.Printf("[DB ERROR] add skip_count task %d: %v", taskID, err)
+		l.Error("db update failed: inc skip_count", "err", err)
 	}
 }
 
-func (r *Recorder) StatsForStartNewGame(ctx context.Context, user game.User) {
+// Статы старта новой игры
+func (r *Recorder) StatsForStartNewGame(ctx context.Context, user game.User, sessionID int64) {
+	l := slog.Default().With("component", "recorder", "action", "stats_for_start_new_game", "user_id", user.ID)
 
-	err := r.userRepo.CreateIfNotExists(ctx, user.ID, user.Username, user.FirstName)
-	if err != nil {
-		log.Printf("[DB ERROR] with ctreate User: %v", err)
+	if err := r.userRepo.CreateIfNotExists(ctx, user.ID, user.Username, user.FirstName); err != nil {
+		l.Error("db update failed: create user if not exists", "err", err)
 	}
 
-	err = r.userRepo.IncGamesPlayed(ctx, user.ID)
-	if err != nil {
-		log.Printf("[DB ERROR] with add game for User: %v", err)
+	if err := r.userRepo.IncGamesPlayed(ctx, user.ID); err != nil {
+		l.Error("db update failed: inc games played", "err", err)
+	}
+
+	if err := r.sessionRepo.IncPlayers(ctx, sessionID); err != nil {
+		l.Error("db update failed: session inc player", "err", err)
 	}
 }
 
-func (r *Recorder) UsersVotesStatsUpdate(ctx context.Context, scores []game.PlayerScore) {
+func (r *Recorder) UsersVotesStatsUpdate(ctx context.Context, scores []game.PlayerScore, usersIDs []int64) {
+	l := slog.Default().With("component", "recorder", "action", "users_votes_stats_update")
 
 	votesByUser := make(map[int64]int64, len(scores))
 	for _, u := range scores {
 		votesByUser[u.UserID] = int64(u.Value)
 	}
 
+	if err := r.userRepo.IncUsersPhotosSent(ctx, usersIDs); err != nil {
+		l.Error("db update failed: inc users photos", "users", len(usersIDs), "err", err)
+	}
+
 	if err := r.userRepo.IncUsersVotes(ctx, votesByUser); err != nil {
-		log.Println(err)
+		l.Error("db update failed: inc users votes", "users", len(votesByUser), "err", err)
 	}
 }
 
 func (r *Recorder) CreateSessionRecord(ctx context.Context, chatID int64) int64 {
+	l := slog.Default().With("component", "recorder", "action", "create_session_record", "chat_id", chatID)
+
 	id, err := r.sessionRepo.CreateSession(ctx, chatID)
 	if err != nil {
-		log.Println(err)
+		l.Error("db insert failed: create session", "err", err)
+		return 0
 	}
 
 	return id
 }
 
-func (r *Recorder) FinishSessionRecord(ctx context.Context, chatID int64) {
-	err := r.sessionRepo.FinishSession(ctx, chatID)
-	if err != nil {
-		log.Println(err)
+func (r *Recorder) FinishSessionRecord(ctx context.Context, sessionID int64) {
+	l := slog.Default().With("component", "recorder", "action", "finish_session_record", "session_id", sessionID)
+
+	if err := r.sessionRepo.FinishSession(ctx, sessionID); err != nil {
+		l.Error("db update failed: finish session", "err", err)
 	}
 }
 
 func (r *Recorder) IsFirstGame(ctx context.Context, chatID int64) bool {
+	l := slog.Default().With("component", "recorder", "action", "is_first_game", "chat_id", chatID)
+
 	res, err := r.sessionRepo.HasAnySession(ctx, chatID)
 	if err != nil {
-		log.Println(err)
+		l.Error("db query failed: has any session", "err", err)
+		return false
 	}
-	return res
+
+	return !res
 }

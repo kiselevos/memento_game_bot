@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"database/sql"
-	"fmt"
+	"errors"
 )
 
 // ensureRowsAffected возвращает ошибку, если UPDATE/DELETE не затронул ни одной строки.
@@ -12,7 +12,7 @@ func ensureRowsAffected(res sql.Result, notFoundMsg string) error {
 		return nil
 	}
 	if n == 0 {
-		return fmt.Errorf(notFoundMsg)
+		return errors.New(notFoundMsg)
 	}
 	return nil
 }

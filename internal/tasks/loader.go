@@ -10,7 +10,7 @@ import (
 
 func LoadTasksFromFile() ([]models.Task, error) {
 
-	data, err := os.ReadFile("../assets/tasks.json")
+	data, err := os.ReadFile("./assets/tasks.json")
 	if err != nil {
 		return nil, err
 	}

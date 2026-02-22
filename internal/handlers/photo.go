@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
-	"log"
-	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
 	"github.com/kiselevos/memento_game_bot/internal/botinterface"
@@ -22,12 +19,12 @@ type PhotoHandlers struct {
 
 func NewPhotoHandlers(bot botinterface.BotInterface, gm *game.GameManager) *PhotoHandlers {
 
-	h := &PhotoHandlers{
+	ph := &PhotoHandlers{
 		Bot:         bot,
 		GameManager: gm,
 	}
 
-	return h
+	return ph
 }
 
 func (ph *PhotoHandlers) Register() {
@@ -44,16 +41,13 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	chatID := c.Chat().ID
 	user := game.GetUserFromTelebot(c.Sender())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	photo := c.Message().Photo
 	if photo == nil {
 		return nil
 	}
 	fileID := photo.File.FileID
 
-	userName, replaced, err := ph.GameManager.SubmitPhoto(ctx, chatID, &user, fileID)
+	userName, replaced, err := ph.GameManager.SubmitPhoto(chatID, &user, fileID)
 	if err != nil {
 		switch err {
 		case game.ErrNoSession:
@@ -84,11 +78,7 @@ func (ph *PhotoHandlers) TakeUserPhoto(c telebot.Context) error {
 	)
 
 	if err == nil && msg != nil {
-		if e := ph.GameManager.SaveSystemMsgID(chatID, msg.ID); e != nil {
-			log.Printf("[PHOTO][ERROR] SaveSystemMsgID failed chat=%d msg=%d err=%v", chatID, msg.ID, e)
-		} else {
-			log.Printf("[PHOTO] saved system msg id chat=%d msg=%d", chatID, msg.ID)
-		}
+		ph.GameManager.SaveSystemMsgID(chatID, msg.ID)
 	}
 
 	return nil

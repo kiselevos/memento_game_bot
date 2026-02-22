@@ -6,16 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kiselevos/memento_game_bot/internal/db"
-	"github.com/kiselevos/memento_game_bot/internal/models"
 )
-
-type SessionRepositoryInterface interface {
-	Create(session *models.Session) (*models.Session, error)
-	GetSessionByID(chatID int64) (*models.Session, error)
-	ChangeIsActive(chatID int64) error
-	AddUserToSession(session *models.Session, user *models.User) error
-	AddPhotosCount(chatID int64) error
-}
 
 type SessionRepo struct {
 	db *sql.DB
@@ -75,4 +66,20 @@ SELECT EXISTS (
 		return false, fmt.Errorf("sessions exists: %w", err)
 	}
 	return exists, nil
+}
+
+// Добавить юзера к сессии
+func (repo *SessionRepo) IncPlayers(ctx context.Context, sessionID int64) error {
+	if sessionID == 0 {
+		return nil
+	}
+	_, err := repo.db.ExecContext(ctx, `
+        UPDATE sessions
+        SET players = players + 1
+        WHERE id = $1
+    `, sessionID)
+	if err != nil {
+		return fmt.Errorf("inc session players: %w", err)
+	}
+	return nil
 }

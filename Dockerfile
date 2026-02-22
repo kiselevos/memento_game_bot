@@ -1,12 +1,21 @@
-FROM golang:1.24
+FROM golang:1.24-alpine AS builder
 
-WORKDIR /app
+WORKDIR /src
+RUN apk add --no-cache ca-certificates git
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+ARG APP_PATH=./cmd/main
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o /out/app ${APP_PATH}
 
-RUN go build -o bot ./cmd/main.go
 
-CMD ["./bot"]
+FROM alpine:3.20
+WORKDIR /app
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /out/app /app/app
+
+ENTRYPOINT ["/app/app"]

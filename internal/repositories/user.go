@@ -53,7 +53,6 @@ WHERE tg_user_id = $1
 
 // После раунда инкрементируем голоса и фотографии для юзера
 func (repo *UserRepo) IncUsersVotes(ctx context.Context, votesByUser map[int64]int64) error {
-
 	if len(votesByUser) == 0 {
 		return nil
 	}
@@ -61,9 +60,8 @@ func (repo *UserRepo) IncUsersVotes(ctx context.Context, votesByUser map[int64]i
 	query := `
 UPDATE users u
 SET
-	photos_sent = u.photos_sent + 1,
-	votes_cast  = u.votes_cast + v.votes,
-	updated_at  = now()
+	votes_cast = u.votes_cast + v.votes,
+	updated_at = now()
 FROM (VALUES `
 
 	args := make([]any, 0, len(votesByUser)*2)
@@ -76,7 +74,7 @@ FROM (VALUES `
 		}
 		first = false
 
-		query += fmt.Sprintf("($%d,$%d)", i, i+1)
+		query += fmt.Sprintf("($%d::bigint,$%d::bigint)", i, i+1)
 		args = append(args, tgUserID, votes)
 		i += 2
 	}
@@ -85,9 +83,28 @@ FROM (VALUES `
 ) AS v(tg_user_id, votes)
 WHERE u.tg_user_id = v.tg_user_id
 `
-	_, err := repo.db.ExecContext(ctx, query, args...)
-	if err != nil {
+	if _, err := repo.db.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("users batch inc votes: %w", err)
+	}
+	return nil
+}
+
+func (repo *UserRepo) IncUsersPhotosSent(ctx context.Context, userIDs []int64) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	query := `
+UPDATE users
+SET
+	photos_sent = photos_sent + 1,
+	updated_at  = now()
+WHERE tg_user_id = ANY($1::bigint[])
+`
+
+	_, err := repo.db.ExecContext(ctx, query, userIDs)
+	if err != nil {
+		return fmt.Errorf("users batch inc photos_sent: %w", err)
 	}
 
 	return nil

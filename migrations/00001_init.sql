@@ -1,5 +1,7 @@
 -- +goose Up
 
+SET TIME ZONE 'UTC';
+
 -- =========================
 -- tasks
 -- =========================
@@ -86,6 +88,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
   id         BIGSERIAL PRIMARY KEY,
   chat_id    BIGINT NOT NULL,
+  players    INTEGER NOT NULL DEFAULT 0,
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   ended_at   TIMESTAMPTZ
 );
@@ -108,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at DESC);
 
 -- +goose Down
 
-DROP TABLE IF EXISTS feedback;
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS feedback CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;

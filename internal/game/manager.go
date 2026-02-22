@@ -2,17 +2,21 @@ package game
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
+	"time"
 
 	messages "github.com/kiselevos/memento_game_bot/assets"
+	"github.com/kiselevos/memento_game_bot/internal/logging"
 	"github.com/kiselevos/memento_game_bot/internal/models"
 	"github.com/kiselevos/memento_game_bot/internal/tasks"
 )
 
 // GameManager - управляет активными игровыми сессиями
 type GameManager struct {
+	appCtx context.Context
 	actors map[int64]*chatActor
 	mu     sync.Mutex
 
@@ -21,12 +25,17 @@ type GameManager struct {
 }
 
 // NewGameManager создаёт и возвращает новый экземпляр GameManager
-func NewGameManager(stats StatsRecorder, tasks TaskStore) *GameManager {
+func NewGameManager(ctx context.Context, stats StatsRecorder, tasks TaskStore) *GameManager {
 	if stats == nil {
 		stats = NoopStatsRecorder{}
 	}
 
+	if tasks == nil {
+		tasks = NoopTaskStore{}
+	}
+
 	return &GameManager{
+		appCtx: ctx,
 		actors: make(map[int64]*chatActor),
 		mu:     sync.Mutex{},
 
@@ -34,6 +43,17 @@ func NewGameManager(stats StatsRecorder, tasks TaskStore) *GameManager {
 		tasks: tasks,
 	}
 }
+
+var (
+	ErrNoSession          = fmt.Errorf("game: no active session")
+	ErrNoTasksLeft        = fmt.Errorf("game: no tasks left")
+	ErrRoundNotActive     = fmt.Errorf("game: round not active")
+	ErrWrongState         = fmt.Errorf("game: wrong game state")
+	ErrInvariantViolation = fmt.Errorf("game: invariant violation")
+	ErrLoadTasksFromDB    = fmt.Errorf("game: failed to load tasks from db")
+	ErrLoadTasksLocal     = fmt.Errorf("game: local failed to load tasks")
+	ErrOnlyHost           = fmt.Errorf("game: not host")
+)
 
 // Механизм очереди во избежание data race
 func (gm *GameManager) Do(chatID int64, fn func(a *chatActor) error) error {
@@ -50,12 +70,6 @@ func (gm *GameManager) Do(chatID int64, fn func(a *chatActor) error) error {
 	return <-reply
 }
 
-var (
-	ErrNoSession      = fmt.Errorf("no active session")
-	ErrNoTasksLeft    = fmt.Errorf("no tasks left")
-	ErrRoundNotActive = fmt.Errorf("round not active")
-)
-
 // Чтобы не тянуть sessions в handlers
 func (gm *GameManager) DoWithSession(chatID int64, fn func(s *GameSession) error) error {
 	return gm.Do(chatID, func(a *chatActor) error {
@@ -66,26 +80,50 @@ func (gm *GameManager) DoWithSession(chatID int64, fn func(s *GameSession) error
 	})
 }
 
+func (gm *GameManager) DoAsHost(
+	chatID int64,
+	userID int64,
+	fn func(s *GameSession) error,
+) error {
+	return gm.Do(chatID, func(a *chatActor) error {
+		if a.session == nil {
+			return ErrNoSession
+		}
+
+		if a.session.Host.ID != userID {
+			return ErrOnlyHost
+		}
+
+		return fn(a.session)
+	})
+}
+
 // StartNewGameSession - запускает/перезапускает игру. Все очки стираются.
-func (gm *GameManager) StartNewGameSession(ctx context.Context, chatID int64, user User) error {
+func (gm *GameManager) StartNewGameSession(chatID int64, user User) (bool, error) {
+
+	fallbackUsed := false
 
 	// Достаем вопросы для игровой сессии
-	taskList, err := gm.tasks.GetActiveTaskList(ctx, nil)
+	dbCtx, cancel := gm.dbCtx()
+	taskList, err := gm.tasks.GetActiveTaskList(dbCtx, nil)
+	cancel()
+
 	if err != nil || len(taskList) == 0 {
-		log.Printf("[ERROR]load tasks: %s", err)
 		taskList, err = tasks.LoadTasksFromFile()
 		if err != nil {
-			return fmt.Errorf("Problem with backoff loader: %w", err)
+			return fallbackUsed, fmt.Errorf("%w: %w", ErrLoadTasksLocal, err)
 		}
+		fallbackUsed = true
 	}
 
 	tasks.ShuffleTasks(taskList)
 
 	// Запись новой игровой сессии в БД
-	sessionID := gm.stats.CreateSessionRecord(ctx, chatID)
+	dbCtx, cancel = gm.dbCtx()
+	sessionID := gm.stats.CreateSessionRecord(dbCtx, chatID)
+	cancel()
 
 	err = gm.Do(chatID, func(a *chatActor) error {
-		log.Printf("[GAME] Игра запущена в чате %d", chatID)
 
 		session := &GameSession{
 			SessionID:   sessionID,
@@ -100,27 +138,27 @@ func (gm *GameManager) StartNewGameSession(ctx context.Context, chatID int64, us
 			Tasks:     taskList,
 		}
 
-		session.UserNames[session.Host.ID] = DisplayNameHTML(&user)
-
 		a.session = session
 		return nil
 	})
 
 	if err != nil {
-		return err
+		return fallbackUsed, err
 	}
 
-	return nil
+	return fallbackUsed, nil
 }
 
 // CheckFirstGame - Проверка на первую игру в группе.
-func (gm *GameManager) CheckFirstGame(ctx context.Context, chatID int64) bool {
-	return gm.stats.IsFirstGame(ctx, chatID)
+func (gm *GameManager) CheckFirstGame(chatID int64) bool {
+	dbCtx, cancel := gm.dbCtx()
+	defer cancel()
 
+	return gm.stats.IsFirstGame(dbCtx, chatID)
 }
 
 // Обработка раунда через сессию и запись в DB
-func (gm *GameManager) StartNewRound(ctx context.Context, chatID int64) (int, string, error) {
+func (gm *GameManager) StartNewRound(chatID, userID int64) (int, string, error) {
 
 	var (
 		round      int
@@ -129,12 +167,17 @@ func (gm *GameManager) StartNewRound(ctx context.Context, chatID int64) (int, st
 		countPhoto int
 	)
 
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+	err := gm.DoAsHost(chatID, userID, func(s *GameSession) error {
 		// Достаем текущий раунд
 		round = s.CountRounds
 
 		var err error
 		prevTaskID, countPhoto, newTask, err = s.StartNewRound()
+
+		if errors.Is(err, ErrInvalidTransition) {
+			return fmt.Errorf("%w: %v", ErrWrongState, err)
+		}
+
 		return err
 	})
 
@@ -144,15 +187,20 @@ func (gm *GameManager) StartNewRound(ctx context.Context, chatID int64) (int, st
 
 	// Запись таски в DB
 	if prevTaskID != 0 {
-		gm.stats.IncrementTaskUsage(ctx, prevTaskID, int64(countPhoto))
+		dbCtx, cancel := gm.dbCtx()
+		gm.stats.IncrementTaskUsage(dbCtx, prevTaskID, int64(countPhoto))
+		cancel()
 	}
 
 	return round, newTask.Text, nil
 }
 
-func (gm *GameManager) SubmitPhoto(ctx context.Context, chatID int64, user *User, fileID string) (userName string, replaced bool, err error) {
+func (gm *GameManager) SubmitPhoto(chatID int64, user *User, fileID string) (userName string, replaced bool, err error) {
 
-	isNewUser := false
+	var (
+		sessionID int64
+		isNewUser bool
+	)
 
 	err = gm.DoWithSession(chatID, func(s *GameSession) error {
 
@@ -163,12 +211,24 @@ func (gm *GameManager) SubmitPhoto(ctx context.Context, chatID int64, user *User
 
 		// UsersPhoto nil
 		if s.UsersPhoto == nil {
-			fmt.Println("[ERROR] При запущенном раунде не создался объект UserPhoto")
+			slog.Default().Error("invariant violated: UsersPhoto is nil",
+				"chat_id", chatID,
+				"user_id", user.ID,
+				"action", "submit_photo",
+				"state", s.FSM.Current(),
+			)
+			logging.Notify(slog.LevelError, "invariant violated: UsersPhoto is nil",
+				"chat_id", chatID,
+				"user_id", user.ID,
+				"state", s.FSM.Current(),
+			)
+			return ErrInvariantViolation
 		}
 
 		// Проверка на нового User
 		if _, ok := s.UserNames[user.ID]; !ok {
 			isNewUser = true
+			sessionID = s.SessionID
 		}
 
 		replaced = s.TakePhoto(user, fileID)
@@ -182,7 +242,9 @@ func (gm *GameManager) SubmitPhoto(ctx context.Context, chatID int64, user *User
 
 	// Запись статистики в DB
 	if isNewUser {
-		gm.stats.StatsForStartNewGame(ctx, *user)
+		dbCtx, cancel := gm.dbCtx()
+		gm.stats.StatsForStartNewGame(dbCtx, *user, sessionID)
+		cancel()
 	}
 
 	return userName, replaced, nil
@@ -196,12 +258,15 @@ type VoteResult struct {
 	IsError    bool
 }
 
-func (gm *GameManager) StartVoting(chatID int64) ([]VotePhoto, error) {
+func (gm *GameManager) StartVoting(chatID, userID int64) ([]VotePhoto, error) {
 	var photos []VotePhoto
 
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+	err := gm.DoAsHost(chatID, userID, func(s *GameSession) error {
 		items, err := s.StartVoting()
 		if err != nil {
+			if errors.Is(err, ErrInvalidTransition) {
+				return fmt.Errorf("%w: %v", ErrWrongState, err)
+			}
 			return err
 		}
 
@@ -240,19 +305,28 @@ func (gm *GameManager) RegisterVote(chatID int64, voter *User, photoNum int) (*V
 }
 
 // Закончить голосование и получить очки
-func (gm *GameManager) FinishVoting(ctx context.Context, chatID int64) ([]PlayerScore, error) {
+func (gm *GameManager) FinishVoting(chatID, userID int64) ([]PlayerScore, error) {
 
 	var scores []PlayerScore
+	var usersIDs []int64
 
-	err := gm.DoWithSession(chatID, func(s *GameSession) error {
+	err := gm.DoAsHost(chatID, userID, func(s *GameSession) error {
 		if err := s.FinishVoting(); err != nil {
+			if errors.Is(err, ErrInvalidTransition) {
+				return fmt.Errorf("%w: %v", ErrWrongState, err)
+			}
 			return err
 		}
+		usersIDs = s.GetPlayersIDs()
 		scores = s.RoundScore()
 		return nil
 	})
 
-	gm.stats.UsersVotesStatsUpdate(ctx, scores)
+	if err == nil {
+		dbCtx, cancel := gm.dbCtx()
+		gm.stats.UsersVotesStatsUpdate(dbCtx, scores, usersIDs)
+		cancel()
+	}
 
 	return scores, err
 }
@@ -268,13 +342,8 @@ func (gm *GameManager) SaveVotePhotoMsgID(chatID int64, photoNum int, msgID int)
 // Сохранеям в сессии системные msg_id для последующего удаления
 func (gm *GameManager) SaveSystemMsgID(chatID int64, msgID int) error {
 	return gm.DoWithSession(chatID, func(s *GameSession) error {
-		log.Printf("[SaveSystemMsgID] BEFORE len=%d add=%d session_ptr=%p",
-			len(s.SystemMsgIDs), msgID, s,
-		)
+
 		s.SystemMsgIDs = append(s.SystemMsgIDs, msgID)
-		log.Printf("[SaveSystemMsgID] AFTER  len=%d session_ptr=%p",
-			len(s.SystemMsgIDs), s,
-		)
 		return nil
 	})
 }
@@ -316,10 +385,19 @@ func (gm *GameManager) GetTotalScore(chatID int64) ([]PlayerScore, error) {
 	return scores, err
 }
 
-func (gm *GameManager) EndGame(ctx context.Context, chatID int64) error {
+func (gm *GameManager) EndGame(chatID, userID int64) error {
+
 	var sessionID int64
 
 	err := gm.Do(chatID, func(a *chatActor) error {
+
+		if a.session == nil {
+			return ErrNoSession
+		}
+
+		if a.session.Host.ID != userID {
+			return ErrOnlyHost
+		}
 
 		sessionID = a.session.SessionID
 
@@ -332,9 +410,15 @@ func (gm *GameManager) EndGame(ctx context.Context, chatID int64) error {
 	}
 
 	if sessionID != 0 {
-		gm.stats.FinishSessionRecord(ctx, sessionID)
+
+		dbCtx, cancel := gm.dbCtx()
+		gm.stats.FinishSessionRecord(dbCtx, sessionID)
+		cancel()
 	}
 
 	return nil
+}
 
+func (gm *GameManager) dbCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(gm.appCtx, 5*time.Second)
 }

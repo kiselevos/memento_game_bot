@@ -4,6 +4,7 @@ import (
 	"html"
 	"strings"
 
+	messages "github.com/kiselevos/memento_game_bot/assets"
 	"gopkg.in/telebot.v3"
 )
 
@@ -29,7 +30,7 @@ func GetUserFromTelebot(u *telebot.User) User {
 // Как обращаться к участнику
 func DisplayNameHTML(u *User) string {
 	if u == nil {
-		return "Анонимный Осётр"
+		return messages.UnnownPerson
 	}
 
 	// FirstName приоритет
@@ -44,5 +45,5 @@ func DisplayNameHTML(u *User) string {
 	}
 
 	// Фолбэк
-	return "Анонимный Осётр"
+	return messages.UnnownPerson
 }

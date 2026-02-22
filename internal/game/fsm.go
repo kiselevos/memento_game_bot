@@ -1,8 +1,8 @@
 package game
 
 import (
+	"errors"
 	"fmt"
-	"log"
 )
 
 type State string
@@ -48,26 +48,15 @@ func (f *FSM) Current() State {
 	return f.current
 }
 
+var ErrInvalidTransition = errors.New("fsm: invalid transition")
+
 func (f *FSM) Trigger(event Event) error {
 	next, ok := f.transistions[f.current][event]
 	if !ok {
-		log.Printf("[FSM] invalid transition: %s --(%s)--> ?", f.current, event)
-		return fmt.Errorf("invalid transition: %s → (%s)", f.current, event)
+		return fmt.Errorf("%w: %s --(%s)--> ?", ErrInvalidTransition, f.current, event)
 	}
-	log.Printf("[FSM] %s --(%s)--> %s", f.current, event, next)
 	f.current = next
 	return nil
-}
-
-// Обертка над тригером.
-func SafeTrigger(fsm *FSM, event Event, context string) bool {
-	err := fsm.Trigger(event)
-	if err != nil {
-		log.Printf("[FSM][WARN] %s: переход не выполнен (%s → %s): %v",
-			context, fsm.Current(), event, err)
-		return false
-	}
-	return true
 }
 
 // ForceState - для тестирования

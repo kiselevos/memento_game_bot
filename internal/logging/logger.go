@@ -1,26 +1,32 @@
 package logging
 
 import (
-	"log"
+	"log/slog"
 	"os"
-	"path/filepath"
+
+	"github.com/kiselevos/memento_game_bot/internal/config"
 )
 
-func InitLogger(logFilePath string) {
+func InitSlogLogger(logCfg config.LogConfig) *slog.Logger {
 
-	dir := filepath.Dir(logFilePath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			log.Fatalf("Не удалось создать директорию логов: %v", err)
-		}
+	var handler slog.Handler
+
+	if logCfg.AppEnv == "prod" {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: logCfg.Level,
+		})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     logCfg.Level,
+			AddSource: true,
+		})
 	}
 
-	file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("Не удалось открыть лог-файл: %v", err)
-	}
+	logger := slog.New(handler).With(
+		"service", "memento-bot",
+		"env", logCfg.AppEnv,
+	)
 
-	log.SetOutput(file)
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.Println("=====> Start logging....")
+	slog.SetDefault(logger)
+	return logger
 }
