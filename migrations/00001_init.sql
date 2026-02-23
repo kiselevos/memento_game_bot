@@ -8,6 +8,7 @@ SET TIME ZONE 'UTC';
 CREATE TABLE IF NOT EXISTS tasks (
   id          BIGSERIAL PRIMARY KEY,
   text        TEXT NOT NULL UNIQUE,
+  category    TEXT,
   is_active   BOOLEAN NOT NULL DEFAULT TRUE,
   use_count   BIGINT  NOT NULL DEFAULT 0,
   skip_count  BIGINT  NOT NULL DEFAULT 0,
