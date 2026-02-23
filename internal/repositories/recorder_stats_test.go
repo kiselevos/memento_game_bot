@@ -19,7 +19,6 @@ func TestRecorder_StatsForStartNewGame(t *testing.T) {
 		t.Fatalf("session not created")
 	}
 
-	// tg_user_id (у тебя он UNIQUE), считаем что game.User.ID = tg_user_id
 	u := game.User{
 		ID:        55501,
 		Username:  "oleg",

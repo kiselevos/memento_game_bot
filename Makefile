@@ -116,7 +116,7 @@ test-all: ## Run all tests include postgres-data
 	@echo "✅ Tests finished"
 
 
-PHONY: lint
+.PHONY: lint
 lint: ## Run fmt & vet
 	@go fmt ./...
 	@go vet ./...
