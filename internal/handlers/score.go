@@ -49,8 +49,6 @@ func (sh *ScoreHandlers) HandleScore(c telebot.Context) error {
 		return c.Send(messages.GameNotStarted, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
 	}
 
-	markup.InlineKeyboard = [][]telebot.InlineButton{{sh.RoundHandlers.StartRoundBtn}}
-
 	result := bot.RenderScore(bot.GameScore, totalScore)
-	return c.Send(result, &telebot.SendOptions{ParseMode: telebot.ModeHTML}, markup)
+	return c.Send(result, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
 }

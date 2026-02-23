@@ -47,8 +47,8 @@ func TestGameSession_IsHost(t *testing.T) {
 func TestGameSession_GetUserName_Default(t *testing.T) {
 	s := newTestSession(nil)
 
-	if got := s.GetUserName(999); got != messages.UnnownPerson {
-		t.Fatalf("GetUserName()=%q, want %q", got, messages.UnnownPerson)
+	if got := s.GetUserName(999); got != messages.UnknownPerson {
+		t.Fatalf("GetUserName()=%q, want %q", got, messages.UnknownPerson)
 	}
 }
 

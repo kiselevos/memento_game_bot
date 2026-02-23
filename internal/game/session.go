@@ -53,7 +53,7 @@ func (s *GameSession) GetUserName(userID int64) string {
 	if name, ok := s.UserNames[userID]; ok {
 		return name
 	}
-	return messages.UnnownPerson
+	return messages.UnknownPerson
 }
 
 func (s *GameSession) TotalScore() []PlayerScore {

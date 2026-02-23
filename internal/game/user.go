@@ -30,7 +30,7 @@ func GetUserFromTelebot(u *telebot.User) User {
 // Как обращаться к участнику
 func DisplayNameHTML(u *User) string {
 	if u == nil {
-		return messages.UnnownPerson
+		return messages.UnknownPerson
 	}
 
 	// FirstName приоритет
@@ -45,5 +45,5 @@ func DisplayNameHTML(u *User) string {
 	}
 
 	// Фолбэк
-	return messages.UnnownPerson
+	return messages.UnknownPerson
 }
