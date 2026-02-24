@@ -2,7 +2,7 @@ package mock
 
 import "github.com/kiselevos/memento_game_bot/internal/models"
 
-// FakeSessionRepo — мок реализации SessionRepository
+// FakeSessionRepo - мок реализации SessionRepository
 type FakeSessionRepo struct {
 	Created []*models.Session
 }
