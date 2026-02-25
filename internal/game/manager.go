@@ -186,7 +186,7 @@ func (gm *GameManager) StartNewRound(chatID, userID int64) (int, string, error) 
 	}
 
 	// Запись таски в DB
-	if prevTaskID != 0 {
+	if prevTaskID != 0 && isGroupChat(chatID) {
 		dbCtx, cancel := gm.dbCtx()
 		gm.stats.IncrementTaskUsage(dbCtx, prevTaskID, int64(countPhoto))
 		cancel()
@@ -421,4 +421,9 @@ func (gm *GameManager) EndGame(chatID, userID int64) error {
 
 func (gm *GameManager) dbCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(gm.appCtx, 5*time.Second)
+}
+
+// Проверка на групповой чат
+func isGroupChat(chatID int64) bool {
+	return chatID < 0
 }
