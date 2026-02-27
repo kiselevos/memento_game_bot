@@ -73,7 +73,6 @@ func TestMain(m *testing.M) {
 		panic(fmt.Errorf("db ping: %w", err))
 	}
 
-	// ✅ создаём твой тип db.Db, который ожидают репозитории
 	testDatabase = &db.Db{
 		DB: sqlDB,
 	}
@@ -84,7 +83,6 @@ func TestMain(m *testing.M) {
 		panic(fmt.Errorf("goose dialect: %w", err))
 	}
 
-	// ✅ поправь путь под свой проект
 	migrationsDir := "../../migrations"
 
 	if err := goose.Up(testDatabase.DB, migrationsDir); err != nil {
